@@ -1,0 +1,4286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>海克斯麻将</title>
+    <style>
+        :root {
+            --bg-color: #006400;
+            --table-texture: repeating-linear-gradient(45deg, rgba(0,0,0,0.05) 0px, rgba(0,0,0,0.05) 2px, transparent 2px, transparent 4px);
+            --tile-w: 48px;
+            --tile-h: 66px;
+            --tile-depth: 4px;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            background-image: var(--table-texture);
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            flex: 1;
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+            perspective: 1000px;
+        }
+
+        /* Players Layout */
+        .player-area {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none; /* Let clicks pass through to controls if needed */
+        }
+        
+        .player-area .hand {
+            pointer-events: auto;
+        }
+
+        .info {
+            background: rgba(0,0,0,0.5);
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            z-index: 10;
+            pointer-events: auto; /* Enable clicks on info area (hextechs) */
+        }
+
+        #top-player { top: 20px; left: 0; right: 0; flex-direction: column; }
+        #top-player .hand { flex-direction: row; gap: 0; }
+        /* 对家（顶位）手牌紧挨，与左右竖排一致美观 */
+        #top-player .hand .tile { transform: scale(0.8); margin: 0 -10px; }
+        
+        #left-player { top: 0; bottom: 0; left: 20px; flex-direction: row; }
+        #left-player .hand { flex-direction: column; }
+        
+        #right-player { top: 0; bottom: 0; right: 20px; flex-direction: row-reverse; }
+        #right-player .hand { flex-direction: column; }
+        
+        #bottom-player { bottom: 20px; left: 0; right: 0; flex-direction: column; justify-content: flex-end; }
+        #bottom-player .hand { margin-bottom: 20px; }
+
+        /* Center Area (Discards) */
+        #center-area {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 400px;
+            height: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+        }
+
+        /* Discard Zones General */
+        .discard-zone {
+            pointer-events: auto;
+            display: flex;
+            align-content: flex-start;
+            gap: 0;
+            padding: 5px;
+        }
+        
+        /* Wrapper for side players to handle rotation space */
+        .discard-wrapper {
+            position: relative;
+            width: 140px;
+            height: 360px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 40px; /* Consistent distance from hand */
+        }
+
+        /* Top (Player 2) */
+        #discard-2 { 
+            flex-direction: row-reverse;
+            flex-wrap: wrap-reverse;
+            justify-content: center;
+            transform: rotate(180deg);
+            width: 360px;
+            margin-top: 40px; /* Distance from hand */
+        }
+        
+        /* Left (Player 3) */
+        #discard-3 { 
+            flex-direction: row-reverse;
+            flex-wrap: wrap-reverse;
+            justify-content: center;
+            align-content: center;
+            transform: rotate(90deg);
+            width: 360px;
+            height: 140px;
+            position: absolute;
+        }
+        
+        /* Right (Player 1) */
+        #discard-1 { 
+            flex-direction: row-reverse;
+            flex-wrap: wrap-reverse;
+            justify-content: center;
+            align-content: center;
+            transform: rotate(-90deg);
+            width: 360px;
+            height: 140px;
+            position: absolute;
+        }
+        
+        /* Bottom (Player 0) */
+        #discard-0 { 
+            flex-direction: row; 
+            flex-wrap: wrap; 
+            justify-content: center; 
+            width: 360px;
+            margin-bottom: 40px; /* Distance from hand */
+        }
+        
+        .discard-zone .tile {
+            transform: scale(0.7); /* Smaller tiles */
+            margin: -9px -7px; /* Negative margin to remove gaps caused by scaling */
+        }
+
+        /* Tile Styling */
+        .tile {
+            width: var(--tile-w);
+            height: var(--tile-h);
+            background: linear-gradient(135deg, #fff 0%, #f0f0f0 100%);
+            border-radius: 6px;
+            box-shadow: 
+                1px 1px 0 #ccc,
+                2px 2px 0 #ccc,
+                3px 3px 0 #ccc,
+                4px 4px 4px rgba(0,0,0,0.3);
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            user-select: none;
+            overflow: hidden;
+            border: 1px solid #e0e0e0;
+        }
+
+        .tile:active {
+            transform: translate(2px, 2px);
+            box-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+
+        .tile.selected {
+            transform: translateY(-15px);
+            box-shadow: 
+                1px 16px 0 #ccc,
+                2px 17px 0 #ccc,
+                3px 18px 0 #ccc,
+                4px 20px 10px rgba(0,0,0,0.4);
+            border: 1px solid #87ceeb;
+            z-index: 100;
+        }
+        
+        .tile.ting-candidate {
+            box-shadow: 0 0 0 2px gold, 4px 4px 4px rgba(0,0,0,0.3);
+            z-index: 50;
+        }
+
+        .tile-face-down {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            border: 1px solid #2980b9;
+        }
+        .tile-face-down::after {
+            content: '';
+            position: absolute;
+            top: 4px; bottom: 4px; left: 4px; right: 4px;
+            border: 1px dashed rgba(255,255,255,0.3);
+            border-radius: 4px;
+        }
+
+        /* Tile Content Graphics */
+        .tile-content {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2px;
+            box-sizing: border-box;
+        }
+
+        /* Dot (Circle) Styles */
+        .dot { border-radius: 50%; box-shadow: inset -1px -1px 2px rgba(0,0,0,0.2); }
+        .dot-container { display: flex; flex-wrap: wrap; justify-content: space-around; align-content: space-around; width: 100%; height: 100%; padding: 4px; }
+        
+        /* Bamboo Styles */
+        .bamboo-stick { width: 4px; border-radius: 2px; position: relative; }
+        .bamboo-bird { width: 100%; height: 100%; background-size: contain; background-repeat: no-repeat; background-position: center; }
+        
+        /* Character Styles */
+        .char-wan { font-family: 'KaiTi', 'STKaiti', serif; line-height: 1; font-weight: 900; }
+        .char-honor { font-family: 'KaiTi', 'STKaiti', serif; font-size: 36px; line-height: 1; }
+
+        /* Colors */
+        .color-red { color: #d00; fill: #d00; background-color: #d00; }
+        .color-green { color: #008000; fill: #008000; background-color: #008000; }
+        .color-blue { color: #00f; fill: #00f; background-color: #00f; }
+        .color-black { color: #000; fill: #000; background-color: #000; }
+
+        /* Hand Layouts */
+        .hand {
+            display: flex;
+            gap: 2px;
+            align-items: flex-end;
+            min-height: 80px;
+        }
+
+        #left-player .hand, #right-player .hand {
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-width: 60px;
+        }
+        
+        #left-player .hand .tile, #right-player .hand .tile {
+            transform: scale(0.9);
+            margin: -10px 0; /* Stack effect */
+        }
+        
+        /* Controls */
+        #controls {
+            position: absolute;
+            bottom: 180px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 200;
+            pointer-events: none; /* Container passes clicks */
+        }
+        
+        #controls button {
+            pointer-events: auto;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            font-size: 20px;
+            font-weight: bold;
+            border: 4px solid rgba(255,255,255,0.8);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: all 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-shadow: 1px 1px 0 rgba(0,0,0,0.2);
+        }
+        
+        #btn-peng { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; }
+        #btn-gang { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; }
+        #btn-hu { background: linear-gradient(135deg, #ff0844 0%, #ffb199 100%); color: white; font-size: 24px; width: 70px; height: 70px; }
+        #btn-ting { background: linear-gradient(135deg, #f6d365 0%, #fda085 100%); color: white; }
+        #btn-discard { background: #fff; color: #333; display: none; } /* Hide standard discard button, use interactions */
+        #btn-pass { background: #ccc; color: #666; font-size: 14px; width: 40px; height: 40px; }
+
+        button:hover { transform: scale(1.1); box-shadow: 0 6px 15px rgba(0,0,0,0.4); }
+        button:active { transform: scale(0.95); }
+
+        /* Animations */
+        @keyframes draw-anim {
+            0% { transform: translateY(-20px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+        .anim-draw { animation: draw-anim 0.3s ease-out; }
+
+        /* Tile Internal Visuals */
+        .tile-content {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        
+        .color-red { color: #d00; background-color: #d00; border-color: #d00; }
+        .color-green { color: #080; background-color: #080; border-color: #080; }
+        .color-blue { color: #00d; background-color: #00d; border-color: #00d; }
+        .color-black { color: #000; background-color: #000; border-color: #000; }
+        
+        /* Text overrides for background-color usage (dots/sticks use bg, text uses color) */
+        .char-wan, .char-honor { background-color: transparent !important; }
+
+        .dot {
+            border-radius: 50%;
+            box-shadow: inset -1px -1px 2px rgba(0,0,0,0.3), inset 1px 1px 2px rgba(255,255,255,0.5);
+        }
+
+        .bamboo-stick {
+            width: 6px; /* default width */
+            border-radius: 4px;
+            box-shadow: inset -1px 0 1px rgba(0,0,0,0.3);
+        }
+
+        .char-wan {
+            font-family: "KaiTi", "楷体", "STKaiti", serif;
+            font-weight: 900;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .char-honor {
+            font-family: "KaiTi", "楷体", "STKaiti", serif;
+            font-weight: 900;
+            font-size: 34px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Hextech Modal Styles */
+        #hextech-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 2000;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .hextech-container {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .hextech-card {
+            width: 220px;
+            height: 300px;
+            border-radius: 15px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+            background: #2a2a2a;
+            border: 2px solid #555;
+            color: #eee;
+        }
+        
+        .hextech-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+        }
+        
+        .hextech-card.silver { 
+            border-color: #e0e0e0; 
+            box-shadow: 0 0 15px rgba(224, 224, 224, 0.4); 
+            background: linear-gradient(135deg, #444 0%, #777 50%, #444 100%);
+            color: #fff;
+        }
+        .hextech-card.gold { 
+            border-color: #ffd700; 
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.4); 
+            background: linear-gradient(135deg, #554400 0%, #997700 50%, #554400 100%);
+            color: #fff;
+        }
+        .hextech-card.prismatic { 
+            border-color: #00ffff; 
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.6); 
+            background: linear-gradient(135deg, #2c3e50 0%, #4a148c 50%, #b71c1c 100%);
+            color: #fff;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+        }
+        
+        .hextech-icon {
+            width: 60px;
+            height: 60px;
+            margin-bottom: 15px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.3); /* Transparent dark to blend with gradient */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+        
+        .hextech-name { font-size: 20px; font-weight: bold; margin-bottom: 10px; text-shadow: 0 2px 2px rgba(0,0,0,0.5); }
+        .hextech-desc { font-size: 14px; line-height: 1.4; color: #eee; text-shadow: 0 1px 1px rgba(0,0,0,0.5); }
+        
+        /* Player Hextech Icons */
+        .player-hextechs {
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+            justify-content: center;
+        }
+        .mini-hextech {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            cursor: help;
+            border: 1px solid #fff;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+        .mini-hextech.silver { background: linear-gradient(135deg, #e0e0e0, #7f8c8d); }
+        .mini-hextech.gold { background: linear-gradient(135deg, #f1c40f, #d35400); }
+        .mini-hextech.prismatic { background: linear-gradient(135deg, #8e44ad, #c0392b, #f39c12); }
+
+        /* Start Screen Styles */
+        #start-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,64,0,0.95); /* Dark Green overlay */
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            backdrop-filter: blur(5px);
+        }
+        #btn-start-game {
+            padding: 20px 60px;
+            font-size: 28px;
+            background: linear-gradient(135deg, #ffd700 0%, #fdb931 100%); /* Gold button */
+            border: 4px solid #fff;
+            border-radius: 50px;
+            color: #8b4500;
+            font-weight: 900;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transition: transform 0.2s;
+            animation: pulse-btn 2s infinite;
+        }
+        #btn-start-game:active { transform: scale(0.95); }
+        
+        @keyframes pulse-btn {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 20px rgba(255, 215, 0, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); }
+        }
+
+        @keyframes rotate-phone {
+            0% { transform: rotate(0deg); }
+            25% { transform: rotate(90deg); }
+            50% { transform: rotate(90deg); }
+            75% { transform: rotate(0deg); }
+            100% { transform: rotate(0deg); }
+        }
+
+        /* --- Mobile Responsive Support & Force Landscape --- */
+        
+        /* 1. Base Mobile Overrides (Apply to all narrow/mobile screens) */
+        @media screen and (max-width: 1024px), screen and (orientation: portrait) {
+            :root {
+                /* 移动端麻将牌尺寸调整 (Adjusted) */
+                --tile-w: 8.5vmin; 
+                --tile-h: 12vmin;
+                --tile-depth: 1.5vmin;
+            }
+
+            /* Convert fixed pixel containers to relative units */
+            #center-area {
+                width: 35vmin !important;
+                height: 35vmin !important;
+            }
+
+            /* Round Info Positioning (Physical Top-Left) */
+            #round-info {
+                position: absolute !important;
+                left: 3vmin !important;
+                bottom: 3vmin !important; /* Game Bottom-Left */
+                top: auto !important;
+                margin: 0 !important;
+                transform: none !important;
+                font-size: 4vmin !important;
+                z-index: 100;
+                background: rgba(0,0,0,0.6) !important;
+                white-space: nowrap;
+            }
+
+            .discard-wrapper {
+                width: 20vmin !important;
+                height: 38vmin !important;
+                margin: 0 1vmin !important;
+            }
+
+            #discard-0, #discard-2 {
+                width: 60vmin !important;
+                margin: 1vmin 0 !important;
+            }
+
+            /* Adjust side discards transform */
+            #discard-1 { 
+                width: 38vmin !important; height: 20vmin !important;
+                transform: rotate(-90deg) translate(0, -20vmin) !important; 
+            }
+            #discard-3 { 
+                width: 38vmin !important; height: 20vmin !important;
+                transform: rotate(90deg) translate(0, -20vmin) !important; 
+            }
+
+            /* Controls */
+            #controls {
+                bottom: 18vmin !important; 
+                gap: 2vmin !important;
+            }
+            #controls button {
+                width: 14vmin !important;
+                height: 14vmin !important;
+                font-size: 5vmin !important;
+                border-width: 2px !important;
+            }
+            #btn-hu {
+                width: 16vmin !important;
+                height: 16vmin !important;
+                font-size: 7vmin !important;
+            }
+
+            /* Players */
+            .player-area { padding: 0 !important; }
+            .hand { min-height: 0 !important; }
+            
+            #top-player { top: 1vmin !important; }
+            #bottom-player { bottom: 1vmin !important; }
+            #left-player { left: 1vmin !important; }
+            #right-player { right: 1vmin !important; }
+
+            /* Fix hand tile scaling & spacing for Side Players */
+            #left-player .hand .tile, #right-player .hand .tile {
+                margin: -2.2vmin 0 !important; /* Compensate for scale to prevent gaps */
+                transform: scale(0.65); /* Scale down to fit */
+            }
+            
+            #top-player .hand .tile, #bottom-player .hand .tile {
+                margin: 0 -0.5vmin !important;
+                transform: scale(0.95);
+            }
+
+            /* Hide Info/Hextechs to save space if needed, or scale down */
+            .info {
+                transform: scale(0.65);
+                transform-origin: center;
+                white-space: nowrap;
+                padding: 1px 3px !important;
+            }
+            
+            /* Specific fix for side players info position */
+            #left-player .info { margin-right: -4vmin; z-index: 10; }
+            #right-player .info { margin-left: -4vmin; z-index: 10; }
+        }
+
+        /* Desktop specific style for round-info */
+        @media screen and (min-width: 1025px) {
+            #round-info {
+                position: absolute;
+                top: 80px; /* Moved down to avoid overlap with deck-info */
+                left: 20px;
+                transform: none;
+                z-index: 5;
+            }
+        }
+
+        /* 2. Force Landscape Mode for Portrait Screens */
+        @media screen and (orientation: portrait) {
+            body {
+                width: 100vw;
+                height: 100vh;
+                overflow: hidden;
+                background: #000; /* Black background for out-of-bounds */
+            }
+
+            #game-container, #start-screen {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                /* Swap dimensions: Width = Height of screen, Height = Width of screen */
+                width: 100vh;
+                height: 100vw;
+                transform: translate(-50%, -50%) rotate(90deg);
+                transform-origin: center center;
+                overflow: hidden;
+                background: var(--bg-color);
+                background-image: var(--table-texture);
+            }
+
+            /* Adjust controls orientation if needed, but rotating container handles it */
+        }
+    </style>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+<div id="start-screen">
+    <div style="font-size: 48px; margin-bottom: 20px; font-weight:bold; text-shadow: 0 5px 10px rgba(0,0,0,0.5);">🀄 海克斯麻将</div>
+    <div style="margin-bottom: 30px; font-size: 16px; color: #eee; text-align:center; max-width: 80%;">
+        请输入玩家昵称和房间号，然后点击下方按钮加入游戏<br>
+        <span style="font-size:14px; opacity:0.8;">首次点击会启用音效与语音</span>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:12px; width:260px; max-width:80%;">
+        <input id="input-player-name" type="text" placeholder="玩家昵称" maxlength="12"
+               style="padding:10px 14px; border-radius:6px; border:1px solid rgba(255,255,255,0.4); outline:none; font-size:16px; text-align:center; background:rgba(0,0,0,0.35); color:#fff;">
+        <input id="input-room-name" type="text" placeholder="房间号 (4位数字)" maxlength="4"
+               style="padding:10px 14px; border-radius:6px; border:1px solid rgba(255,255,255,0.4); outline:none; font-size:16px; text-align:center; background:rgba(0,0,0,0.35); color:#fff;">
+    </div>
+    <button id="btn-create-room" style="margin-top:26px;">创建房间</button>
+    <button id="btn-start-game" style="margin-top:10px;">加入房间</button>
+    <div id="login-status" style="margin-top:14px; font-size:14px; color:#ffd700;"></div>
+</div>
+
+<div id="game-container">
+    <div id="top-player" class="player-area">
+        <div class="info" id="info-2">
+            <span class="player-name">电脑 (上)</span> <span class="dealer-badge" id="dealer-badge-2" style="display:none; color:#ff4d4d; border:1px solid #ff4d4d; border-radius:3px; padding:0 4px; margin:0 5px; font-size:12px;">庄</span> <span class="score-display" style="color:#ffd700; font-weight:bold;">0</span>
+            <div class="player-hextechs" id="hextechs-2"></div>
+        </div>
+        <div class="hand" id="hand-2"></div>
+        <div class="discard-zone" id="discard-2"></div> <!-- Top Discards -->
+    </div>
+    
+    <div id="left-player" class="player-area">
+        <div class="info" id="info-3" style="writing-mode: vertical-rl; display:flex; align-items:center;">
+            <div><span class="player-name">电脑 (左)</span> <span class="dealer-badge" id="dealer-badge-3" style="display:none; color:#ff4d4d; border:1px solid #ff4d4d; border-radius:3px; padding:0 4px; margin:0 5px; font-size:12px;">庄</span> <span class="score-display" style="color:#ffd700; font-weight:bold;">0</span></div>
+            <div class="player-hextechs" id="hextechs-3" style="flex-direction:column; margin-top:5px;"></div>
+        </div>
+        <div class="hand" id="hand-3"></div>
+        <div class="discard-wrapper">
+            <div class="discard-zone" id="discard-3"></div> <!-- Left Discards -->
+        </div>
+    </div>
+
+    <div id="deck-info" style="position:absolute; top:20px; left:20px; color:#fff; font-size:18px; font-weight:bold; background:rgba(0,0,0,0.5); padding:8px 12px; border-radius:8px; z-index:100; pointer-events:none; border: 1px solid rgba(255,255,255,0.2);">
+        剩余: --
+    </div>
+
+    <div id="round-info" style="font-size: 20px; color: #ffd700; font-weight:bold; background:rgba(0,0,0,0.4); padding:5px 15px; border-radius:20px; pointer-events:none;">第 1 / 16 局</div>
+    <div id="room-id-display" style="position:absolute; top:20px; right:20px; font-size:16px; color:#ffd700; background:rgba(0,0,0,0.4); padding:5px 12px; border-radius:12px; pointer-events:none; display:none;">房间号: —</div>
+    <div id="center-area">
+        <!-- Center Info / Deck Counter could go here -->
+        <div style="grid-column: 2/4; grid-row: 2/4; display:flex; flex-direction:column; justify-content:center; align-items:center; opacity:0.8; pointer-events:none; z-index: -1;">
+            <div id="timer-display" style="font-size: 32px; color: #ff4d4d; margin-top: 15px; font-weight: bold; background: rgba(0,0,0,0.6); width: 50px; height: 50px; border-radius: 50%; display: flex; justify-content: center; align-items: center; border: 3px solid #fff;">20</div>
+        </div>
+    </div>
+
+    <div id="right-player" class="player-area">
+        <div class="info" id="info-1" style="writing-mode: vertical-rl; display:flex; align-items:center;">
+            <div><span class="player-name">电脑 (右)</span> <span class="dealer-badge" id="dealer-badge-1" style="display:none; color:#ff4d4d; border:1px solid #ff4d4d; border-radius:3px; padding:0 4px; margin:2px 0; font-size:12px;">庄</span> <span class="score-display" style="color:#ffd700; font-weight:bold;">0</span></div>
+            <div class="player-hextechs" id="hextechs-1" style="flex-direction:column; margin-top:5px;"></div>
+        </div>
+        <div class="hand" id="hand-1"></div>
+        <div class="discard-wrapper">
+            <div class="discard-zone" id="discard-1"></div> <!-- Right Discards -->
+        </div>
+    </div>
+
+    <div id="bottom-player" class="player-area">
+        <div id="controls">
+            <!-- Action Timer -->
+            <div id="action-timer" style="display:none; color:white; background:rgba(255,0,0,0.7); padding:5px 10px; border-radius:5px; margin-right:10px; font-weight:bold;">10s</div>
+            <!-- Action Buttons (Floating) -->
+            <button id="btn-peng" style="display:none;">碰</button>
+            <button id="btn-gang" style="display:none;">杠</button>
+            <button id="btn-anjian" style="display:none;">暗箭</button>
+            <button id="btn-hu" style="display:none;">胡</button>
+            <button id="btn-ting" style="display:none;">听</button>
+            <button id="btn-pass" style="display:none;">过</button>
+            
+            <!-- Hidden/Utility -->
+            <button id="btn-discard" style="display:none;">出</button>
+            <button id="btn-cancel-takeover" style="display:none; background:linear-gradient(135deg,#ff9800,#ff5722); color:white; font-size:14px; padding:8px 16px; border-radius:8px; white-space:nowrap; min-width:88px;">取消托管</button>
+        </div>
+        <div class="discard-zone" id="discard-0"></div> <!-- Bottom Discards -->
+        <div class="hand" id="hand-0"></div>
+        <div class="info" id="info-0">
+            <span class="player-name">玩家 (你)</span> <span class="dealer-badge" id="dealer-badge-0" style="display:none; color:#ff4d4d; border:1px solid #ff4d4d; border-radius:3px; padding:0 4px; margin:0 5px; font-size:12px;">庄</span> <span class="score-display" style="color:#ffd700; font-weight:bold;">0</span>
+            <div class="player-hextechs" id="hextechs-0"></div>
+        </div>
+    </div>
+
+    <div id="hextech-modal">
+        <div style="color:white; font-size:32px; font-weight:bold;">选择你的海克斯强化</div>
+        <div id="hextech-timer" style="color:#ffd700; font-size:24px; margin-top:10px;">40s</div>
+        <div class="hextech-container" id="hextech-selection-container">
+            <!-- Cards will be injected here -->
+        </div>
+    </div>
+
+    <div id="message-area" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.85); color:white; padding:30px; border-radius:15px; text-align:center; z-index:1000; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+        <!-- Messages injected by JS -->
+    </div>
+</div>
+
+<script>
+    // --- 游戏常量 ---
+    const SUITS = ['万', '筒', '条'];
+    const NUMBERS = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
+    const WINDS = ['东', '南', '西', '北'];
+    const DRAGONS = ['中', '发财', '白板'];
+    
+    // --- 海克斯数据 (Hextech Data) ---
+    const HEXTECH_TIERS = { SILVER: 'silver', GOLD: 'gold', PRISMATIC: 'prismatic' };
+    const HEXTECH_DATA = {
+        // Silver
+        'silver_1': { id: 'silver_1', tier: 'silver', name: '杠头小利', desc: '每次明杠（点杠）时，额外从点杠者处获得1分。' },
+        'silver_3': { id: 'silver_3', tier: 'silver', name: '摸牌入门', desc: '每局轮到自己的第一次出牌时，可选择一张手牌与牌堆中的随机一张牌交换。' },
+        'silver_4': { id: 'silver_4', tier: 'silver', name: '边张好手', desc: '自摸胡3、7时，每家多付1分。' },
+        'silver_6': { id: 'silver_6', tier: 'silver', name: '补杠达人', desc: '补杠时每家多付1分。' },
+        'silver_new_1': { id: 'silver_new_1', tier: 'silver', name: '省钱专家', desc: '点炮时少支付 1 分。' },
+        'silver_new_2': { id: 'silver_new_2', tier: 'silver', name: '杠上添花', desc: '结算时若本局有杠，额外得 2 分(由系统支付)。' },
+        'silver_new_3': { id: 'silver_new_3', tier: 'silver', name: '报听补贴', desc: '报听后若流局，系统补偿 3 分。' },
+        'silver_new_4': { id: 'silver_new_4', tier: 'silver', name: '红包开局', desc: '选定后立即获得 10 分(由系统支付)。' },
+        'silver_new_5': { id: 'silver_new_5', tier: 'silver', name: '早起鸟儿', desc: '前 10 巡胡牌额外加 4 分(由系统支付)。' },
+        'silver_new_6': { id: 'silver_new_6', tier: 'silver', name: '底力', desc: '分数全场最低时，胡牌时总得分 +5(由系统支付)。' },
+        'silver_new_7': { id: 'silver_new_7', tier: 'silver', name: '收集癖', desc: '胡牌时手牌中有 2 对刻子，额外加 2 分(由系统支付)。' },
+        'silver_new_8': { id: 'silver_new_8', tier: 'silver', name: '闲家之光', desc: '作为闲家胡牌时，多收每家 1 分。' },
+        'silver_new_9': { id: 'silver_new_9', tier: 'silver', name: '稳扎稳打', desc: '每连续 3 局不点炮，获得 4 分奖励(由系统支付)。' },
+        'silver_new_10': { id: 'silver_new_10', tier: 'silver', name: '环保卫士', desc: '胡牌没有风牌时，得分 +2(由系统支付)。' },
+        'silver_new_11': { id: 'silver_new_11', tier: 'silver', name: '清仓处理', desc: '手牌少于等于 5 张牌时（多碰/杠）胡牌，加 3 分(由系统支付)。' },
+        'silver_new_12': { id: 'silver_new_12', tier: 'silver', name: '礼尚往来', desc: '出牌被别人杠后，对方需立即支付你 1 分补偿。' },
+
+        // Gold
+        'gold_1': { id: 'gold_1', tier: 'gold', name: '疯狂杠精', desc: '所有杠分（明/暗/补）翻倍。' },
+        'gold_2': { id: 'gold_2', tier: 'gold', name: '庄家威严', desc: '庄家自摸时，闲家支付6分。' },
+        'gold_5': { id: 'gold_5', tier: 'gold', name: '连庄霸主', desc: '连庄（>=2）胡牌总分+3(由系统支付)。' },
+        'gold_6': { id: 'gold_6', tier: 'gold', name: '绝地翻盘', desc: '总分最后一名时，自摸翻倍。' },
+        'gold_7': { id: 'gold_7', tier: 'gold', name: '杠后余生', desc: '杠上炮免单，由系统支付。' },
+        'gold_8': { id: 'gold_8', tier: 'gold', name: '精准打击', desc: '点炮给庄家只需支付1分（无视翻倍）。' },
+        'gold_10': { id: 'gold_10', tier: 'gold', name: '刮风下雨', desc: '流局时未听牌者额外赔你2分。' },
+        'gold_new_1': { id: 'gold_new_1', tier: 'gold', name: '庄家世家', desc: '作为庄家得分从 2 倍收益变为 3 倍。' },
+        'gold_new_2': { id: 'gold_new_2', tier: 'gold', name: '风牌克星', desc: '无风牌时胡牌，胡牌得分额外+5(由系统支付)。' },
+        'gold_new_3': { id: 'gold_new_3', tier: 'gold', name: '连胜风暴', desc: '连胡两局后，后续每局加基础分 3分(由系统支付)。' },
+        'gold_new_4': { id: 'gold_new_4', tier: 'gold', name: '死磕到底', desc: '胡牌时若只有一张听牌（单钓），胡牌得分额外+5(由系统支付)。' },
+        'gold_new_5': { id: 'gold_new_5', tier: 'gold', name: '资源回收', desc: '轮到自己出牌时，可以用手中一张牌和自己弃牌区的牌交换然后再正常出牌，每回合限使用一次。' },
+        'gold_new_6': { id: 'gold_new_6', tier: 'gold', name: '快节奏', desc: '前 12 巡胡牌，本回合得分翻倍。' },
+        'gold_new_7': { id: 'gold_new_7', tier: 'gold', name: '社交恐怖', desc: '每碰一次牌，本回合胡牌基础分 +2(由系统支付)。' },
+        'gold_new_8': { id: 'gold_new_8', tier: 'gold', name: '暗箱操作', desc: '永久看到三名对手手牌的前 3 张。' },
+        'gold_new_9': { id: 'gold_new_9', tier: 'gold', name: '资本家', desc: '你每拥有的 10 个积分，胡牌分额外 +1(由系统支付)。' },
+
+        // Prismatic
+        'prism_3': { id: 'prism_3', tier: 'prismatic', name: '暗箭难防', desc: '手中刻子结算时算暗杠分（不公开）。' },
+        'prism_4': { id: 'prism_4', tier: 'prismatic', name: '推倒之王', desc: '胡牌时，未听牌者支付翻倍。' },
+        'prism_6': { id: 'prism_6', tier: 'prismatic', name: '庄家杀手', desc: '闲家胡庄家（点炮/自摸），庄家付3倍。' },
+        'prism_9': { id: 'prism_9', tier: 'prismatic', name: '十三幺契约', desc: '第一次出牌后，只要手牌没有对子（允许顺子），每巡+1分(由系统支付)。一旦出牌后手牌有对子，契约终止。' },
+        'prism_new_1': { id: 'prism_new_1', tier: 'prismatic', name: '全民皆兵', desc: '别人给你点炮视为你自摸。' },
+        'prism_new_2': { id: 'prism_new_2', tier: 'prismatic', name: '天命所归', desc: '开局指定一张随机牌为“万能牌”（仅手牌有效）。' },
+        'prism_new_3': { id: 'prism_new_3', tier: 'prismatic', name: '终结者', desc: '胡牌且有杠，胡牌得分 ×2。' },
+        'prism_new_4': { id: 'prism_new_4', tier: 'prismatic', name: '镜像世界', desc: '你可以看到所有人的手牌。' },
+        'prism_new_5': { id: 'prism_new_5', tier: 'prismatic', name: '孤注一掷', desc: '报听后无法摸牌，只能等别人点炮，胡牌分 ×5。' },
+        'prism_new_6': { id: 'prism_new_6', tier: 'prismatic', name: '老当益壮', desc: '在第 11 巡后胡牌，胡牌分 ×5。' },
+        'prism_new_7': { id: 'prism_new_7', tier: 'prismatic', name: '推倒一切', desc: '胡牌时若无刻子（全顺子），额外+10分(由系统支付)。' },
+        'prism_new_8': { id: 'prism_new_8', tier: 'prismatic', name: '绝户计', desc: '你打出的牌，别人不能碰、不能杠。' },
+        'prism_new_9': { id: 'prism_new_9', tier: 'prismatic', name: '铁壁', desc: '只要你没听牌，你打出的任何牌别人都不能胡。' },
+        'prism_new_10': { id: 'prism_new_10', tier: 'prismatic', name: '轮回', desc: '本局点炮输掉的分数，若下局胡牌则全额返还(由系统支付)。' },
+        'prism_new_11': { id: 'prism_new_11', tier: 'prismatic', name: '底牌反击', desc: '牌墙不足 10 张时胡牌，额外+10分(由系统支付)。' },
+        'prism_new_12': { id: 'prism_new_12', tier: 'prismatic', name: '不动如山', desc: '不碰不杠（门清）胡牌，额外+10分(由系统支付)。' },
+        'prism_new_13': { id: 'prism_new_13', tier: 'prismatic', name: '棱彩命运', desc: '从所有彩色海克斯中（不包括棱彩命运）随机选择一个彩色海克斯。' },
+        'prism_new_14': { id: 'prism_new_14', tier: 'prismatic', name: '天命眷顾', desc: '每局游戏的前三巡摸牌，你摸到的牌必然是你手中已有的牌。' },
+        'prism_new_15': { id: 'prism_new_15', tier: 'prismatic', name: '大魔法师', desc: '每局游戏第一次轮到你的回合时，主动选择 3 张手牌和场上随机一名玩家交换随机三张手牌，无需另一方确认。' },
+        'prism_new_16': { id: 'prism_new_16', tier: 'prismatic', name: '代码干扰', desc: '每次有玩家碰牌后，混淆对手（除你以外）的牌面 UI 持续一回合。' },
+    };
+
+    function normalizeHextechOptions(rawOptions) {
+        if (!Array.isArray(rawOptions)) return [];
+        return rawOptions.map(function (item) {
+            if (typeof item === 'string') {
+                return HEXTECH_DATA[item];
+            } else if (item && typeof item.id === 'string') {
+                return HEXTECH_DATA[item.id] || item;
+            }
+            return null;
+        }).filter(function (h) { return !!h; });
+    }
+
+    const socket = io();
+    let currentRoomName = '';
+    let localPlayerName = '';
+    let hasJoinedRoom = false;
+
+    const state = {
+        deck: [],
+        players: [
+            { id: 0, name: '玩家', hand: [], discards: [], peng: [], gang: [], isAi: false, isTing: false, score: 0, hextechs: [], consecutiveWins: 0 },
+            { id: 1, name: '电脑(右)', hand: [], discards: [], peng: [], gang: [], isAi: true, isTing: false, score: 0, hextechs: [], consecutiveWins: 0 },
+            { id: 2, name: '电脑(上)', hand: [], discards: [], peng: [], gang: [], isAi: true, isTing: false, score: 0, hextechs: [], consecutiveWins: 0 },
+            { id: 3, name: '电脑(左)', hand: [], discards: [], peng: [], gang: [], isAi: true, isTing: false, score: 0, hextechs: [], consecutiveWins: 0 }
+        ],
+        currentPlayerIndex: 0, // 0: Player, 1: Right, 2: Top, 3: Left
+        dealerId: 0, // 庄家ID
+        consecutiveDealerCount: 0, // 连庄计数
+        currentRound: 1,
+        maxRounds: 16,
+        roundGangScores: [], // 记录本局杠分 { from, to, score, type }
+        selectedTileIndex: -1,
+        lastDiscard: null, // { playerIndex: int, tile: string }
+        gameOver: false,
+        isTingMode: false, // 是否处于选择听牌丢弃牌的状态
+        tingCandidates: {}, // { index: [winningTiles...] }
+        timerId: null,
+        timeLeft: 20,
+        hextechSelectionPending: false, // 是否正在选择海克斯
+        hextechTimerId: null,
+        dealerStreak: 0, // 连庄次数
+        turnCount: 0, // 巡数
+        isGangKaiDiscard: false, // 是否是杠上开花打出的牌 (for Gold 7)
+        actionProcessing: false, // 防止重复点击/并发操作的锁
+        resourceRecycleMode: false, // 资源回收模式
+        swapSourceTileIndex: -1,
+        isTakeover: false // 是否处于 AI 托管中（出牌超时或断线后）
+    };
+
+    socket.on('playerIdAssigned', function (data) {
+        if (data && data.playerId) {
+            var pid = String(data.playerId);
+            localStorage.setItem('majiang_player_id', pid);
+            sessionStorage.setItem('majiang_player_id', pid);
+        }
+    });
+
+    socket.on('reconnectSuccess', function (data) {
+        hasJoinedRoom = true;
+        if (data && data.playerId) {
+            var pid = String(data.playerId);
+            sessionStorage.setItem('majiang_player_id', pid);
+            localStorage.setItem('majiang_player_id', pid);
+        }
+        if (data && typeof data.myId === 'number') {
+            state.myServerId = data.myId;
+        }
+        var statusEl = document.getElementById('login-status');
+        if (statusEl) statusEl.textContent = '重连成功，已恢复对局';
+        var startScreen = document.getElementById('start-screen');
+        if (startScreen) {
+            startScreen.style.opacity = '0';
+            startScreen.style.transition = 'opacity 0.5s';
+            setTimeout(function () {
+                startScreen.style.display = 'none';
+            }, 500);
+        }
+    });
+
+    socket.on('playerJoined', function (payload) {
+        hasJoinedRoom = true;
+        var statusEl = document.getElementById('login-status');
+        if (!statusEl) return;
+        var names = payload.players.map(function (p) { return p.name; }).join('、');
+        statusEl.textContent = '当前房间玩家: ' + names + ' (' + payload.players.length + '/4)';
+    });
+
+    // --- New Event: Play Discard Audio Immediately ---
+    // 监听出牌事件，立即播放语音
+    socket.on('playerDiscarded', function(data) {
+        if (data && data.tile) {
+            if (data.isTing) {
+                speak('听', { noCancel: true });
+            } else {
+                // 报牌名；不取消上一句，避免多人连续出牌时只报最后一张
+                speak(data.tile, { noCancel: true });
+            }
+        }
+    });
+
+    // 监听碰/杠/胡语音（服务端在碰、明杠/暗杠/补杠、胡时都会广播 playerPerformedAction）
+    socket.on('playerPerformedAction', function(data) {
+        if (!data || !data.type) return;
+        var t = String(data.type);
+        if (t === 'peng') { speak('碰', { noCancel: true }); return; }
+        if (t === 'gang') { speak('杠', { noCancel: true }); return; }
+        if (t === 'hu') {
+            speak('胡', { noCancel: true });
+            hideInteractionButtons(); // 有人胡了立即收掉胡/过等，不等 roundEnd
+        }
+    });
+
+    // 监听可用动作 (由服务端扫描后发送，含听牌后杠的 8 秒选择)
+    socket.on('archmageSwapRequest', function(data) {
+        state.archmageSwapMode = true;
+        state.archmageSelectedIndices = [];
+        state.archmageTimeout = data.timeout || 15000;
+        render();
+        var msgEl = document.getElementById('message-area');
+        if (msgEl) {
+            msgEl.style.display = 'block';
+            msgEl.innerHTML = '<div style="color:#ffd700;">【大魔法师】请选择 3 张手牌与随机对手交换（点击手牌选择，选满 3 张后自动发送）</div>';
+        }
+    });
+
+    socket.on('availableActions', function(data) {
+        // data: { actions: [ {type, data} ], discardedTile, discarderId, timeout }
+        state.actionProcessing = false;
+        state.pendingServerActions = data.actions || [];
+        stopTurnTimer(); // 先停出牌20s，只显示碰/杠/胡8s
+        showInteractionButtons(data.actions, data.discardedTile, data.timeout || 8000);
+    });
+
+    // 服务端拒绝动作时（如非法碰/杠/胡/过、房间已满、用户名重复等），解除锁定并提示
+    socket.on('error', function(msg) {
+        state.actionProcessing = false;
+        hasJoinedRoom = false;
+        var area = document.getElementById('message-area');
+        if (area && msg) {
+            area.style.display = 'block';
+            area.textContent = msg;
+            setTimeout(function() { area.style.display = 'none'; }, 3000);
+        }
+        var statusEl = document.getElementById('login-status');
+        if (statusEl && msg) statusEl.textContent = msg;
+    });
+
+    // --- 界面渲染 ---
+
+    function showInteractionButtonsLegacy(canPeng, canGang, canHu) {
+        const actions = [];
+        if (canHu) actions.push({ type: 'hu' });
+        if (canPeng) actions.push({ type: 'peng' });
+        if (canGang) actions.push({ type: 'gang' });
+        showInteractionButtons(actions);
+    }
+
+    function showInteractionButtons(actions, tile, timeout) {
+        const btnHu = document.getElementById('btn-hu');
+        const btnPeng = document.getElementById('btn-peng');
+        const btnGang = document.getElementById('btn-gang');
+        const btnPass = document.getElementById('btn-pass');
+        const actionTimerEl = document.getElementById('action-timer');
+        const centerTimerEl = document.getElementById('timer-display');
+        
+        // Hide all first
+        btnHu.style.display = 'none';
+        btnPeng.style.display = 'none';
+        btnGang.style.display = 'none';
+        btnPass.style.display = 'none';
+        actionTimerEl.style.display = 'none';
+        
+        // Clear existing action timer (碰/杠/胡 8s)
+        if (state.actionTimerId) {
+            clearInterval(state.actionTimerId);
+            state.actionTimerId = null;
+        }
+
+        if (!actions || actions.length === 0) return;
+
+        actions.forEach(action => {
+            if (action.type === 'hu') {
+                btnHu.style.display = 'flex';
+                btnHu.onclick = onHuClick;
+            }
+            if (action.type === 'peng') {
+                btnPeng.style.display = 'flex';
+                btnPeng.onclick = onPengClick;
+            }
+            if (action.type === 'gang') {
+                btnGang.style.display = 'flex';
+                btnGang.onclick = onGangClick;
+            }
+        });
+
+        if (actions.length > 0) {
+            btnPass.style.display = 'flex';
+            btnPass.onclick = onPassClick;
+            
+            // 碰/杠/胡 8s 倒计时：与出牌 20s 同一效果，用中间 timer-display 显示
+            if (timeout && timeout > 0) {
+                var seconds = Math.floor(timeout / 1000);
+                actionTimerEl.style.display = 'block';
+                actionTimerEl.textContent = seconds + 's';
+                if (centerTimerEl) {
+                    centerTimerEl.style.display = 'flex';
+                    centerTimerEl.textContent = seconds;
+                    if (seconds <= 5) {
+                        centerTimerEl.style.color = '#ff4d4d';
+                        centerTimerEl.style.borderColor = '#ff4d4d';
+                    } else {
+                        centerTimerEl.style.color = '#fff';
+                        centerTimerEl.style.borderColor = '#fff';
+                    }
+                }
+                state.actionTimerId = setInterval(function() {
+                    seconds--;
+                    if (seconds <= 0) {
+                        if (state.actionTimerId) {
+                            clearInterval(state.actionTimerId);
+                            state.actionTimerId = null;
+                        }
+                        actionTimerEl.textContent = '0s';
+                        if (centerTimerEl) {
+                            centerTimerEl.textContent = '0';
+                            centerTimerEl.style.color = '#ff4d4d';
+                        }
+                        hideInteractionButtons();
+                    } else {
+                        actionTimerEl.textContent = seconds + 's';
+                        if (centerTimerEl) {
+                            centerTimerEl.textContent = seconds;
+                            if (seconds <= 5) {
+                                centerTimerEl.style.color = '#ff4d4d';
+                                centerTimerEl.style.borderColor = '#ff4d4d';
+                            } else {
+                                centerTimerEl.style.color = '#fff';
+                                centerTimerEl.style.borderColor = '#fff';
+                            }
+                        }
+                    }
+                }, 1000);
+            }
+        }
+    }
+
+    function hideInteractionButtons() {
+        document.getElementById('btn-hu').style.display = 'none';
+        document.getElementById('btn-peng').style.display = 'none';
+        document.getElementById('btn-gang').style.display = 'none';
+        document.getElementById('btn-pass').style.display = 'none';
+        document.getElementById('action-timer').style.display = 'none';
+        state.pendingServerActions = null;
+        var centerTimerEl = document.getElementById('timer-display');
+        if (centerTimerEl) {
+            centerTimerEl.textContent = '';
+            centerTimerEl.style.display = 'none';
+        }
+        if (state.actionTimerId) {
+            clearInterval(state.actionTimerId);
+            state.actionTimerId = null;
+        }
+    }
+
+    function sortHand(hand) {
+        if (!hand) return [];
+        hand.sort((a, b) => getTileWeight(a) - getTileWeight(b));
+    }
+
+
+    // Helper to map server player ID to local view index (0=Bottom/Me, 1=Right, 2=Top, 3=Left)
+    // --- 辅助函数 ---
+    function pHasHex(player, hexId) {
+        if (!player || !player.hextechs) return false;
+        return player.hextechs.some(h => (typeof h === 'string' ? h === hexId : h.id === hexId));
+    }
+
+    function getServerToLocalIndex(serverIndex) {
+        if (typeof state.myServerId === 'undefined') return serverIndex;
+        return (serverIndex - state.myServerId + 4) % 4;
+    }
+
+    socket.on('gameStart', function (data) {
+        currentRoomName = data.roomName;
+        hasJoinedRoom = true; // 成功进入对局
+        state.myServerId = data.myId; // Store my server ID (0-3)
+        state.isTakeover = false;
+        if (data.playerId || (data.self && data.self.playerId)) {
+            var pid = String(data.playerId || data.self.playerId || '');
+            if (pid) {
+                localStorage.setItem('majiang_player_id', pid);
+                sessionStorage.setItem('majiang_player_id', pid);
+            }
+        }
+
+        var startScreen = document.getElementById('start-screen');
+        if (startScreen) {
+            startScreen.style.opacity = '0';
+            startScreen.style.transition = 'opacity 0.5s';
+            setTimeout(function () {
+                startScreen.style.display = 'none';
+            }, 500);
+        }
+
+        state.deck = [];
+        for (var i = 0; i < data.deckSize; i++) {
+            state.deck.push(null);
+        }
+        state.currentPlayerIndex = data.currentPlayerIndex;
+        state.dealerId = data.dealerId;
+
+        // Reset and map players based on rotation
+        data.players.forEach(function (p, serverIdx) {
+            var localIdx = getServerToLocalIndex(serverIdx);
+            if (state.players[localIdx]) {
+                state.players[localIdx].name = p.name;
+                state.players[localIdx].score = p.score;
+                state.players[localIdx].hand = [];
+                state.players[localIdx].hextechs = [];
+            }
+        });
+        // 联机开局时立即更新界面玩家名，避免选海克斯时仍显示“电脑(上)”等
+        state.players.forEach(function (p, localIdx) {
+            var infoEl = document.getElementById('info-' + localIdx);
+            if (infoEl) {
+                var nameSpan = infoEl.querySelector('.player-name');
+                if (nameSpan) nameSpan.textContent = (localIdx === 0 ? p.name + ' (你)' : p.name);
+            }
+        });
+        state.roundNum = (data.roundNum != null ? data.roundNum : 1); // 第1/6/11局选海克斯时服务端会带 roundNum
+
+        var roomIdEl = document.getElementById('room-id-display');
+        if (roomIdEl && currentRoomName) {
+            roomIdEl.style.display = 'block';
+            roomIdEl.textContent = '房间号: ' + currentRoomName;
+        }
+
+        if (data.self && data.self.hand) {
+            state.players[0].hand = data.self.hand.slice();
+        }
+
+        if (data.self && Array.isArray(data.self.hextechOptions) && data.self.hextechOptions.length > 0) {
+            const mapped = normalizeHextechOptions(data.self.hextechOptions);
+            if (mapped.length > 0) {
+                console.log('gameStart hextechOptions raw:', data.self.hextechOptions);
+                console.log('gameStart hextechOptions mapped:', mapped);
+                state.players[0].hextechOptions = mapped;
+                state.hextechSelectionPending = true;
+                renderHextechSelectionModal();
+                startHextechTimer();
+            }
+        }
+
+        render();
+        if (typeof renderPlayerHextechs === 'function') {
+            renderPlayerHextechs();
+        }
+        updateTakeoverButton();
+    });
+
+    socket.on('hexOptions', function(payload) {
+        const raw = payload && Array.isArray(payload.options) ? payload.options : [];
+        const mapped = normalizeHextechOptions(raw);
+        console.log('hexOptions payload:', payload);
+        console.log('hexOptions mapped:', mapped);
+        if (mapped.length === 0) return;
+        state.players[0].hextechOptions = mapped;
+        state.hextechSelectionPending = true;
+        renderHextechSelectionModal();
+        startHextechTimer();
+    });
+
+    socket.on('updateState', function (data) {
+        if (!data || !Array.isArray(data.players)) return;
+        
+        // 无待处理动作时先收掉胡/碰/杠/过和倒计时，避免结算或下一局仍残留
+        var myPending = data.pendingActions && data.pendingActions[state.myServerId];
+        if (!myPending || (Array.isArray(myPending) && myPending.length === 0)) {
+            hideInteractionButtons();
+        } else {
+            // 有碰/杠/胡时先停掉出牌20s，只显示8s动作倒计时，避免“轮到我碰时已是20s且点碰提示超时”
+            stopTurnTimer();
+        }
+        
+        // Reset Game Over state on new state update
+        state.gameOver = false;
+        
+        // Sync global state
+        state.dealerId = data.dealerId;
+        state.currentPlayerIndex = data.currentPlayerIndex;
+        state.deck = data.deck || [];
+        state.roundNum = data.roundNum || 1; // 同步当前局数
+        
+        // 更新局数 UI
+        const roundInfoEl = document.getElementById('round-info');
+        if (roundInfoEl) {
+            roundInfoEl.textContent = `第 ${state.roundNum} / 16 局`;
+        }
+        
+        if (data.deckSize) {
+             state.deck = new Array(data.deckSize).fill(null);
+        }
+        
+        if (data.lastDiscard) {
+            state.lastDiscard = data.lastDiscard;
+        }
+        state.currentPlayerDrewThisTurn = !!data.currentPlayerDrewThisTurn;
+        state.codeInterferenceActive = !!data.codeInterferenceActive;
+        state.waitingForArchmage = data.waitingForArchmage;
+        
+        if (data.roomName) {
+            var roomIdEl = document.getElementById('room-id-display');
+            if (roomIdEl) {
+                roomIdEl.style.display = 'block';
+                roomIdEl.textContent = '房间号: ' + data.roomName;
+            }
+        }
+        
+        // Sync players with rotation
+        data.players.forEach(function (p, serverIdx) {
+            var localIdx = getServerToLocalIndex(serverIdx);
+            if (state.players[localIdx]) {
+                var cp = state.players[localIdx];
+                cp.name = p.name;
+                cp.score = p.score;
+                if (Array.isArray(p.hextechs)) {
+                    cp.hextechs = normalizeHextechOptions(p.hextechs);
+                } else {
+                    cp.hextechs = [];
+                }
+                cp.peng = p.peng || [];
+                cp.gang = p.gang || [];
+                cp.discards = p.discards || [];
+                cp.wildcardTile = p.wildcardTile; // Sync wildcard tile
+                cp.isTing = !!p.isTing;
+
+                var infoEl = document.getElementById('info-' + localIdx);
+                if (infoEl) {
+                    var nameSpan = infoEl.querySelector('.player-name');
+                    if (nameSpan) {
+                        if (localIdx === 0) {
+                            nameSpan.textContent = p.name + ' (你)';
+                        } else {
+                            nameSpan.textContent = p.name;
+                        }
+                    }
+                }
+                
+                if (localIdx !== 0) {
+                    if (Array.isArray(p.hand) && p.hand.length > 0) {
+                        // Server sent visible hand (full or partial with nulls)
+                        // Use it directly
+                        cp.hand = p.hand;
+                    } else if (typeof p.handSize === 'number') {
+                        // Fallback to hidden (all nulls)
+                        cp.hand = new Array(p.handSize).fill(null);
+                    }
+                }
+            }
+        });
+
+        if (data.self) {
+            let newHand = data.self.hand || [];
+            
+            // Sync local player flags
+            const human = state.players[0];
+            human.silver3Used = !!data.self.silver3Used;
+            human.goldNew5Used = !!data.self.goldNew5Used;
+            state.isTakeover = !!data.self.isTakeover;
+            
+            // Check for Silver 3 (摸牌入门)：每局轮到自己第一次出牌时（我的回合且手牌14张）触发
+            const hasSilver3 = pHasHex(state.players[0], 'silver_3');
+            const isMyFirstDiscard = (state.currentPlayerIndex === state.myServerId) && (newHand.length === 14);
+            if (hasSilver3 && !human.silver3Used && !state.swapMode && isMyFirstDiscard) {
+                showSilver3UI(human);
+            }
+
+            // Sort hand locally for display comfort
+            if (newHand.length % 3 === 2 && state.currentPlayerIndex === state.myServerId) {
+                // Only keep last tile separate if it's MY turn and I have 14 tiles
+                const drawn = newHand.pop();
+                sortHand(newHand);
+                newHand.push(drawn);
+            } else {
+                sortHand(newHand);
+            }
+            state.players[0].hand = newHand;
+
+            if (Array.isArray(data.self.hextechOptions)) {
+                const mappedSelfHex = normalizeHextechOptions(data.self.hextechOptions);
+                if (mappedSelfHex.length > 0) {
+                    state.players[0].hextechOptions = mappedSelfHex;
+                }
+            }
+        }
+        
+        // Re-render
+        render();
+        if (typeof renderPlayerHextechs === 'function') {
+            renderPlayerHextechs();
+        }
+        updateTakeoverButton();
+
+        // 允许操作 (如果是我的回合，或者有待处理动作)
+        const hasPendingAction = data.pendingActions && data.pendingActions[state.myServerId];
+        if (state.currentPlayerIndex === state.myServerId || hasPendingAction) {
+             state.actionProcessing = false;
+        }
+
+        if (hasPendingAction) {
+             console.log('Received pending actions from updateState:', data.pendingActions[state.myServerId]);
+             showInteractionButtons(data.pendingActions[state.myServerId], data.lastDiscard && data.lastDiscard.tile ? data.lastDiscard.tile : null, 8000);
+        }
+
+        if (state.currentPlayerIndex === state.myServerId) {
+             const me = state.players[0];
+             const hasDrawnTile = Array.isArray(me.hand) && (me.hand.length % 3 === 2);
+             if (hasDrawnTile) {
+                 startTurnTimer();
+             } else {
+                 stopTurnTimer();
+             }
+             checkActions();
+        } else if (!hasPendingAction) {
+             stopTurnTimer();
+             hideInteractionButtons();
+        }
+    });
+
+    socket.on('roundEnd', function (data) {
+        state.gameOver = true;
+        stopTurnTimer();
+        hideInteractionButtons();
+        // 优先用下一局局数，这样结算后立刻显示“第 2/16 局”，避免第二局仍显示 1/16
+        if (data) {
+            if (data.nextRoundNum != null) state.roundNum = data.nextRoundNum;
+            else if (data.roundNum != null) state.roundNum = data.roundNum;
+        }
+        var roundInfoEl = document.getElementById('round-info');
+        if (roundInfoEl && state.roundNum != null) roundInfoEl.textContent = '第 ' + state.roundNum + ' / 16 局';
+
+        // 立即用服务端下发的积分变动更新本地分数，保证显示一致
+        if (data && data.scoreChanges && typeof data.scoreChanges === 'object') {
+            for (var pid in data.scoreChanges) {
+                var serverId = parseInt(pid, 10);
+                if (isNaN(serverId) || serverId < 0 || serverId > 3) continue;
+                var localIdx = getServerToLocalIndex(serverId);
+                if (state.players[localIdx]) {
+                    var delta = Number(data.scoreChanges[pid]);
+                    if (!isNaN(delta)) state.players[localIdx].score += delta;
+                }
+            }
+        }
+
+        var title = '';
+        var detail = '';
+        var summaryHtml = '';
+
+        if (!data || data.winType === 'liuju') {
+            title = '流局';
+            detail = '本局无人胡牌。';
+        } else {
+            var winnerName = '';
+            var loserName = '';
+
+            if (typeof data.winnerId === 'number') {
+                var winnerServerId = data.winnerId;
+                var winnerLocalIdx = getServerToLocalIndex(winnerServerId);
+                var winner = state.players[winnerLocalIdx];
+                winnerName = winner ? winner.name : ('玩家 ' + (winnerServerId + 1));
+            }
+
+            if (typeof data.loserId === 'number') {
+                var loserServerId = data.loserId;
+                var loserLocalIdx = getServerToLocalIndex(loserServerId);
+                var loser = state.players[loserLocalIdx];
+                loserName = loser ? loser.name : ('玩家 ' + (loserServerId + 1));
+            }
+
+            if (data.winType === 'zimo') {
+                title = '自摸胡牌';
+                detail = winnerName + ' 自摸胡牌。';
+            } else if (data.winType === 'dianpao') {
+                title = '点炮胡牌';
+                detail = winnerName + ' 胡了 ' + loserName + ' 的点炮。';
+            } else {
+                title = '本局结束';
+                detail = winnerName + ' 胜出。';
+            }
+        }
+
+        // 显示海克斯触发总结
+        if (data.summary && data.summary.length > 0) {
+            summaryHtml = '<div style="font-size:14px; color:#aaa; margin:15px 0; text-align:left; max-height:150px; overflow-y:auto; padding:10px; background:rgba(0,0,0,0.2); border-radius:5px;">' +
+                          data.summary.map(s => '<div>• ' + s + '</div>').join('') +
+                          '</div>';
+        }
+
+        // 显示积分：第16局结束显示整场总分，否则显示本局积分变化
+        var scoresHtml = '<div style="margin-bottom:20px; display:flex; justify-content:space-around;">';
+        if (data.isGameOver) {
+            state.players.forEach(function(p, localIdx) {
+                const total = typeof p.score === 'number' ? p.score : 0;
+                const color = total >= 0 ? '#ff4d4d' : '#4dff4d';
+                const sign = total < 0 ? '-' : '';
+                scoresHtml += `<div style="text-align:center">
+                    <div style="font-size:12px; color:#888">${p.name}</div>
+                    <div style="font-size:18px; color:${color}; font-weight:bold">${sign}${Math.abs(total)} 分</div>
+                </div>`;
+            });
+        } else if (data.scoreChanges) {
+            for (let pid in data.scoreChanges) {
+                const change = data.scoreChanges[pid];
+                const color = change >= 0 ? '#ff4d4d' : '#4dff4d';
+                const sign = change >= 0 ? '+' : '';
+                scoresHtml += `<div style="text-align:center">
+                    <div style="font-size:12px; color:#888">玩家${parseInt(pid)+1}</div>
+                    <div style="font-size:18px; color:${color}; font-weight:bold">${sign}${change}</div>
+                </div>`;
+            }
+        }
+        scoresHtml += '</div>';
+
+        var msgEl = document.getElementById('message-area');
+        if (msgEl) {
+            var buttonHtml = '';
+            if (data.isGameOver) {
+                buttonHtml = '<button onclick=\"location.reload()\" style=\"padding:10px 30px; font-size:20px; border-radius:30px; background:#4CAF50; color:white; border:none; cursor:pointer; box-shadow:0 5px 15px rgba(0,0,0,0.3);\">游戏结束 (返回主页)</button>';
+            } else {
+                buttonHtml = '<div style=\"font-size:16px; color:#ffd700; margin-top:10px;\">下一局即将开始...</div>';
+                // 5秒后自动隐藏
+                setTimeout(() => {
+                    msgEl.style.display = 'none';
+                }, 5000);
+            }
+
+            msgEl.innerHTML = ''
+                + '<h2 style=\"margin:0 0 10px 0; font-size:32px; color:#ffd700;\">' + (data.isGameOver ? '游戏结束' : title) + '</h2>'
+                + '<div style=\"font-size:18px; margin-bottom:15px;\">' + (data.isGameOver ? '整场积分总分如下' : detail) + '</div>'
+                + scoresHtml
+                + summaryHtml
+                + buttonHtml;
+            msgEl.style.display = 'block';
+        }
+    });
+
+    // --- 音效系统 (Audio System) ---
+    var _audioUnlocked = false; // 本标签页是否已通过用户手势解锁过音频
+    function unlockAudio() {
+        if (_audioUnlocked) return;
+        _audioUnlocked = true;
+        SoundManager.init();
+        if ('speechSynthesis' in window) {
+            try {
+                window.speechSynthesis.cancel();
+                var empty = new SpeechSynthesisUtterance('');
+                empty.volume = 0.01;
+                window.speechSynthesis.speak(empty);
+                if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+            } catch (e) {}
+        }
+    }
+    // 任意标签页内首次点击/触摸/按键都会解锁本页音频（解决多开时只有部分页面有语音的问题）
+    document.addEventListener('click', unlockAudio, { once: true });
+    document.addEventListener('touchstart', unlockAudio, { once: true });
+    document.addEventListener('keydown', unlockAudio, { once: true });
+
+    const SoundManager = {
+        ctx: null,
+        init: function() {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                this.ctx = new AudioContext();
+                
+                // 播放一个空音来解锁 iOS/Android 的音频限制
+                const buffer = this.ctx.createBuffer(1, 1, 22050);
+                const source = this.ctx.createBufferSource();
+                source.buffer = buffer;
+                source.connect(this.ctx.destination);
+                source.start(0);
+                
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            } catch (e) {
+                console.error('AudioContext init failed:', e);
+            }
+        },
+        playTone: function(freq, type, duration) {
+            if (!this.ctx) return;
+            try {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.type = type || 'sine';
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                
+                gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                
+                osc.start();
+                osc.stop(this.ctx.currentTime + duration);
+            } catch (e) {
+                // Ignore
+            }
+        },
+        playClick: function() {
+            this.playTone(800, 'triangle', 0.1);
+        },
+        playDiscard: function() {
+            // 模拟麻将打出的清脆声音
+            this.playTone(1200, 'sine', 0.05);
+            setTimeout(() => this.playTone(1000, 'sine', 0.05), 50);
+        }
+    };
+
+    // --- 语音播报 ---
+    // noCancel: true 时不取消上一句，避免多人连续出牌时只报最后一张
+    function speak(text, opts) {
+        var noCancel = opts && opts.noCancel === true;
+        if (SoundManager.ctx && SoundManager.ctx.state === 'suspended') {
+            SoundManager.ctx.resume().catch(function() {});
+        }
+        SoundManager.playDiscard();
+        if ('speechSynthesis' in window) {
+            if (!noCancel) window.speechSynthesis.cancel();
+            if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+            var msg = new SpeechSynthesisUtterance();
+            msg.text = text;
+            msg.lang = 'zh-CN';
+            msg.rate = 1.3;
+            msg.pitch = 1.0;
+            var voices = window.speechSynthesis.getVoices();
+            var zhVoice = voices.find(function(v) { return v.name.indexOf('Google') !== -1 && v.lang.indexOf('zh') !== -1; }) ||
+                         voices.find(function(v) { return v.lang.indexOf('zh') !== -1; });
+            if (zhVoice) msg.voice = zhVoice;
+            window.speechSynthesis.speak(msg);
+        }
+    }
+
+    // --- 倒计时逻辑 ---
+    
+    function startTurnTimer() {
+        stopTurnTimer(); // 先清除旧的
+        state.timeLeft = 20;
+        updateTimerDisplay();
+        
+        state.timerId = setInterval(() => {
+            state.timeLeft--;
+            updateTimerDisplay();
+            
+            if (state.timeLeft <= 0) {
+                // stopTurnTimer(); // Don't hide the timer immediately on timeout
+                if (state.timerId) {
+                    clearInterval(state.timerId);
+                    state.timerId = null;
+                }
+                handleTimeout();
+            }
+        }, 1000);
+    }
+    
+    function stopTurnTimer() {
+        if (state.timerId) {
+            clearInterval(state.timerId);
+            state.timerId = null;
+        }
+        document.getElementById('timer-display').textContent = '';
+        document.getElementById('timer-display').style.display = 'none';
+    }
+
+    function updateTakeoverButton() {
+        var btn = document.getElementById('btn-cancel-takeover');
+        if (!btn) return;
+        if (currentRoomName && state.isTakeover && !state.gameOver) {
+            btn.style.display = 'inline-block';
+        } else {
+            btn.style.display = 'none';
+        }
+    }
+    
+    function updateTimerDisplay() {
+        const timerEl = document.getElementById('timer-display');
+        if (timerEl) {
+            if (state.timeLeft <= 0) {
+                timerEl.textContent = '';
+                timerEl.style.display = 'none';
+                return;
+            }
+            timerEl.style.display = 'flex';
+            timerEl.textContent = state.timeLeft;
+            if (state.timeLeft <= 5) {
+                timerEl.style.color = '#ff4d4d';
+                timerEl.style.borderColor = '#ff4d4d';
+            } else {
+                timerEl.style.color = '#fff';
+                timerEl.style.borderColor = '#fff';
+            }
+        }
+    }
+    
+    function handleTimeout() {
+        if (state.gameOver) return;
+        // 出牌超时：不显示“超时”字样，不本地出牌；由服务端接入 AI 托管并自动出牌，界面通过 updateState 显示“取消托管”按钮
+        stopTurnTimer();
+    }
+
+    // --- 核心函数 (Core Functions) ---
+
+    /**
+     * 摸牌逻辑
+     * @param {object} player - 玩家对象
+     * @returns {string|null} - 摸到的牌，如果没有牌了返回null
+     */
+    function drawCard(player) {
+        if (state.deck.length === 0) {
+            const resultMsg = calculateRoundEnd('liuju', null, null);
+            endGame(`流局！牌抓完了。<br>${resultMsg}`);
+            return null;
+        }
+        
+        // 从牌堆移除并获取一张牌
+        const tile = state.deck.pop();
+        
+        // 添加到玩家手牌
+        player.hand.push(tile);
+        
+        // 注意：不再立即排序，而是让新摸到的牌留在最后，方便玩家辨识
+        // sortHand(player.hand); 
+
+        console.log(`${player.name} 摸了 ${tile}`);
+        return tile;
+    }
+
+    // Prism 9 Helper
+    function checkThirteenOrphansContract(player) {
+        // 如果已经听牌，契约直接终止
+        if (player.isTing) return false;
+
+        // 全是单张（无对子，允许顺子）
+        // 检查是否有重复牌 (pairs/triplets)
+        
+        // 1. Check duplicates
+        const counts = {};
+        player.hand.forEach(t => counts[t] = (counts[t] || 0) + 1);
+        if (Object.values(counts).some(c => c > 1)) return false;
+        
+        // 2. Sequence check removed as per new rule (sequences allowed)
+        
+        return true;
+    }
+    
+    function isSequence(t1, t2, t3) {
+        if (!t1 || !t2 || !t3) return false;
+        if (t1.slice(-1) !== t2.slice(-1) || t2.slice(-1) !== t3.slice(-1)) return false; // Different suits
+        if (['风','中','发财','白板'].some(x => t1.includes(x))) return false; // Honor tiles no seq
+        
+        const n1 = getNum(t1);
+        const n2 = getNum(t2);
+        const n3 = getNum(t3);
+        return (n2 === n1 + 1) && (n3 === n2 + 1);
+    }
+    
+    function getNum(tile) {
+        const numMap = {'一':1, '二':2, '三':3, '四':4, '五':5, '六':6, '七':7, '八':8, '九':9};
+        return numMap[tile.slice(0, -1)];
+    }
+
+    /**
+     * 算分/胡牌检测逻辑
+     * 这是一个简化版的胡牌检测，仅支持基本牌型 (x * AAA + y * ABC + DD)
+     * 为了方便扩展'海克斯'，此函数独立。
+     * @param {object} player - 玩家对象
+     * @returns {object} - { score: number, canWin: boolean, details: string }
+     */
+    function calculateScore(player) {
+        // 简单实现：这里目前只返回是否能胡牌的占位符逻辑
+        // 实际麻将胡牌算法比较复杂，这里实现一个基本的"是否胡牌"检测
+        
+        const canWin = checkWin(player.hand, player.peng, player.gang, player.wildcardTile);
+        let score = 0;
+        
+        if (canWin) {
+            // 简单算分：基础分 + 番型
+            score = 10; 
+            // 这里可以添加更多算分逻辑
+        }
+
+        return {
+            score: score,
+            canWin: canWin,
+            details: canWin ? "屁胡" : ""
+        };
+    }
+
+    /**
+     * 山西推倒胡结算模块
+     * @param {string} winType - 'zimo' | 'dianpao' | 'gangkai' | 'liuju'
+     * @param {number} winnerId - 胡牌玩家ID
+     * @param {number} loserId - 点炮玩家ID (仅点炮有效)
+     */
+    function calculateRoundEnd(winType, winnerId, loserId) {
+        const scoreChanges = { 0: 0, 1: 0, 2: 0, 3: 0 };
+        let summary = [];
+        
+        // --- 0. 预处理 (Pre-check Hextech) ---
+        // Prism New 1: 全民皆兵 (别人给你点炮视为你自摸)
+        if (winType === 'dianpao') {
+            const winner = state.players[winnerId];
+            if (playerHasHextechId(winner, 'prism_new_1')) {
+                winType = 'zimo';
+                summary.push(`【全民皆兵】${winner.name} 将点炮视为自摸！全场买单！`);
+            }
+        }
+
+        // Gold 7: 杠后余生 (杠开出牌点炮 -> 无效，系统付分)
+        // 这里的逻辑是：如果是点炮，且打出的牌是杠上开花后打出的牌
+        if (winType === 'dianpao' && state.isGangKaiDiscard) {
+            const loser = state.players[loserId];
+            if (playerHasHextechId(loser, 'gold_7')) {
+                // 变为特殊结算：输家不付分，赢家得分由系统支付
+                // 我们可以标记一个 flag，在下面计算分数时处理
+                // 或者在这里直接处理，但为了复用逻辑，最好只是标记
+                // 但因为逻辑差异大，不如这里直接劫持 winType? 
+                // 不，最好加个 flag
+                loser.immuneToPayment = true; 
+                loser.systemPaysForMe = true; // 系统替我付
+                summary.push(`${loser.name} 触发【杠后余生】，点炮无效，由系统支付胡牌分！`);
+            }
+        }
+
+        // 确定下一局庄家
+        if (winType === 'liuju') {
+             // 流局，下一个人坐庄
+             state.nextDealerId = (state.dealerId + 1) % 4;
+        } else {
+            if (winnerId === state.dealerId) {
+                // 庄家胡牌，连庄
+                state.nextDealerId = state.dealerId;
+                state.dealerStreak = (state.dealerStreak || 0) + 1; // Increment streak
+                summary.push("庄家胡牌，下一局连庄");
+            } else {
+                // 闲家胡牌，下一个人坐庄
+                state.nextDealerId = (state.dealerId + 1) % 4;
+                state.dealerStreak = 0; // Reset streak
+            }
+        }
+
+        // 1. 结算杠分
+        state.roundGangScores.forEach(record => {
+            let payment = record.score;
+            
+            // Prism 4: 推倒之王 (胡牌时，未听牌者支付翻倍) - 这里是杠分，不是胡牌分，忽略。
+            
+            // Gold 10: 刮风下雨 (流局时，杠分有效) - Default implementation is valid.
+            // 默认规则：流局杠分是否有效？通常推倒胡流局杠分也算。这里代码里默认算了。
+            
+            scoreChanges[record.from] -= payment;
+            scoreChanges[record.to] += payment;
+        });
+
+        if (state.roundGangScores.length > 0) {
+            summary.push(`杠分结算完成`);
+        }
+        
+        // Gold 10: 刮风下雨 (流局时，未听牌者额外补偿2分)
+        if (winType === 'liuju') {
+            state.players.forEach(p => {
+                if (playerHasHextechId(p, 'gold_10')) {
+                     // 其他未听牌者给p 2分
+                     state.players.forEach(other => {
+                         if (other.id !== p.id && !other.isTing) {
+                             scoreChanges[other.id] -= 2;
+                             scoreChanges[p.id] += 2;
+                             summary.push(`${other.name} 未听牌，补偿 ${p.name} 2分 (刮风下雨)`);
+                         }
+                     });
+                }
+            });
+            
+            // Silver new 3: 报听补贴 (报听后若流局，系统补偿 3 分)
+            state.players.forEach(p => {
+                if (playerHasHextechId(p, 'silver_new_3') && p.isTing) {
+                    scoreChanges[p.id] += 3;
+                    summary.push(`${p.name} 触发【报听补贴】，系统补偿 3 分`);
+                }
+            });
+        }
+
+        // 2. 结算胡牌分
+        if (winType !== 'liuju') {
+            const dealerId = state.dealerId;
+            const winner = state.players[winnerId];
+            const isWinnerDealer = (winnerId === dealerId);
+            
+            // Base Score Modifiers
+            let extraWinScore = 0;
+            let winMultiplier = 1; // Global multiplier for the winner
+
+            // Gold New 1: 庄家世家 (作为庄家得分从 2 倍收益变为 3 倍)
+            let dealerMultiplier = isWinnerDealer ? 2 : 1;
+            if (isWinnerDealer && playerHasHextechId(winner, 'gold_new_1')) {
+                dealerMultiplier = 3;
+                summary.push("【庄家世家】庄家收益提升至 3 倍");
+            }
+            
+            // Gold New 2: 风牌克星 (无风牌时胡牌，胡牌得分额外+5)
+            if (playerHasHextechId(winner, 'gold_new_2')) {
+                const hasWinds = [...winner.hand, ...winner.peng, ...winner.gang].some(t => t.endsWith('风'));
+                if (!hasWinds) {
+                    extraWinScore += 5;
+                    summary.push("【风牌克星】无风牌，额外+5分");
+                }
+            }
+
+            // Gold New 3: 连胜风暴 (连胡两局后，后续每局加基础分 3分)
+            if (playerHasHextechId(winner, 'gold_new_3') && winner.consecutiveWins >= 2) {
+                const bonus = 3 * (winner.consecutiveWins - 1); // 2 wins -> +3, 3 wins -> +6? No "subsequent round add 3 base"
+                // Desc: "After winning 2 rounds in a row, add 3 points to base score for each subsequent round."
+                // Interpretation: Win #1: 0. Win #2: 0. Win #3: +3. Win #4: +3? Or cumulative?
+                // Let's assume constant +3 bonus when streak >= 2. Or +3 per win beyond 2?
+                // "add 3 points ... for each subsequent round" usually means +3 per round.
+                // Simplified: If streak >= 2, add 3 points.
+                extraWinScore += 3;
+                summary.push("【连胜风暴】连胜奖励，额外+3分");
+            }
+
+            // Gold New 4: 死磕到底 (单钓，胡牌得分额外+5)
+            if (playerHasHextechId(winner, 'gold_new_4')) {
+                // Check if single wait (remove winning tile, check ting candidates)
+                // We need to simulate the hand before winning
+                // 1. Clone hand
+                const checkHand = [...winner.hand];
+                // 2. Remove one winning tile (if zimo, it's in hand. if dianpao, it's pushed before calc)
+                // calculateScore pushed lastDiscard to hand before calling this.
+                // So checkHand contains the winning tile.
+                // We need to find the index of the winning tile and remove it.
+                // If there are multiple same tiles, removing any one is fine for checking ting.
+                const winTile = (winType === 'zimo') ? winner.hand[winner.hand.length-1] : state.lastDiscard.tile;
+                const idx = checkHand.indexOf(winTile);
+                if (idx > -1) {
+                    checkHand.splice(idx, 1);
+                    // 3. Get winning candidates (what tiles could complete this hand)
+                    const winningTiles = getWinningTiles(checkHand, winner.wildcardTile);
+                    if (winningTiles.length === 1) {
+                        extraWinScore += 5;
+                        summary.push("【死磕到底】单钓胡牌，额外+5分");
+                    }
+                }
+            }
+
+            // Gold New 6: 快节奏 (前 12 巡胡牌，本回合得分翻倍)
+            if (playerHasHextechId(winner, 'gold_new_6') && state.turnCount <= 12) {
+                winMultiplier *= 2;
+                summary.push("【快节奏】速攻，得分翻倍");
+            }
+
+            // Gold New 7: 社交恐怖 (每碰一次牌，本回合胡牌基础分 +2)
+            if (playerHasHextechId(winner, 'gold_new_7')) {
+                const pengBonus = winner.peng.length * 2;
+                if (pengBonus > 0) {
+                    extraWinScore += pengBonus;
+                    summary.push(`【社交恐怖】碰牌加成，额外+${pengBonus}分`);
+                }
+            }
+
+            // Gold New 9: 资本家 (每拥有 10 积分，额外 +1)
+            if (playerHasHextechId(winner, 'gold_new_9')) {
+                const capBonus = Math.floor(Math.max(0, winner.score) / 10);
+                if (capBonus > 0) {
+                    extraWinScore += capBonus;
+                    summary.push(`【资本家】资产分红，额外+${capBonus}分`);
+                }
+            }
+
+            // Prism New 3: 终结者 (胡牌且有杠，胡牌得分 ×2)
+            if (playerHasHextechId(winner, 'prism_new_3') && winner.gang.length > 0) {
+                winMultiplier *= 2;
+                summary.push("【终结者】胡牌且有杠，得分×2");
+            }
+
+            // Prism New 5: 孤注一掷 (报听后无法摸牌，胡牌分 ×5)
+            if (playerHasHextechId(winner, 'prism_new_5') && winner.isTing) {
+                winMultiplier *= 5;
+                summary.push("【孤注一掷】得分×5");
+            }
+
+            // Prism New 6: 老当益壮 (第 11 回合后，胡牌翻 5 倍)
+            if (playerHasHextechId(winner, 'prism_new_6') && state.turnCount > 11) {
+                winMultiplier *= 5;
+                summary.push("【老当益壮】后期爆发，得分×5");
+            }
+
+            // Prism New 7: 推倒一切 (胡牌时，若手牌没有刻子（全顺子），胡牌得分额外+10)
+            if (playerHasHextechId(winner, 'prism_new_7')) {
+                if (winner.peng.length === 0 && winner.gang.length === 0) {
+                    // Check concealed triplets
+                    const counts = {};
+                    winner.hand.forEach(t => counts[t] = (counts[t]||0)+1);
+                    if (!Object.values(counts).some(c => c >= 3)) {
+                        extraWinScore += 10;
+                        summary.push("【推倒一切】全顺子，额外+10分");
+                    }
+                }
+            }
+            
+            // Prism New 10: 轮回 (返还上一局点炮输掉的分数)
+            if (playerHasHextechId(winner, 'prism_new_10') && winner.reincarnationScore > 0) {
+                // This is added to final score, handled after payments
+                summary.push(`【轮回】返还上局损失 ${winner.reincarnationScore} 分`);
+            }
+
+            // Prism New 11: 底牌反击 (牌墙剩余不足 10 张时，胡牌得分额外+10)
+            if (playerHasHextechId(winner, 'prism_new_11') && state.deck.length < 10) {
+                extraWinScore += 10;
+                summary.push("【底牌反击】最后时刻，额外+10分");
+            }
+
+            // Prism New 12: 不动如山 (不碰、不杠直到胡牌（门清），胡牌得分额外+10)
+            if (playerHasHextechId(winner, 'prism_new_12') && winner.peng.length === 0 && winner.gang.length === 0) {
+                extraWinScore += 10;
+                summary.push("【不动如山】门清，额外+10分");
+            }
+            
+            // Silver new 2: 杠上添花 (结算时若本局有杠，额外得 2 分)
+            // 只要本局有杠分记录，或者自己有杠
+            if (playerHasHextechId(winner, 'silver_new_2')) {
+                // Check if winner has gangs
+                if (winner.gang.length > 0) {
+                     extraWinScore += 2;
+                     summary.push("【杠上添花】额外+2分");
+                }
+            }
+
+            // Silver new 5: 早起鸟儿 (前 10 巡胡牌额外加 4 分)
+            if (playerHasHextechId(winner, 'silver_new_5') && state.turnCount <= 10) {
+                extraWinScore += 4;
+                summary.push("【早起鸟儿】额外+4分");
+            }
+
+            // Silver new 6: 底力 (分数全场最低时，胡牌时总得分 +5)
+            const minScore = Math.min(...state.players.map(p => p.score));
+            if (playerHasHextechId(winner, 'silver_new_6') && winner.score === minScore) {
+                extraWinScore += 5;
+                summary.push("【底力】额外+5分");
+            }
+
+            // Silver new 7: 收集癖 (胡牌时手牌中有 2 对刻子，额外加 2 分)
+            // Includes Peng, Gang, and concealed triplets in hand.
+            if (playerHasHextechId(winner, 'silver_new_7')) {
+                let tripletCount = winner.peng.length + winner.gang.length;
+                // Check concealed triplets
+                const handCounts = {};
+                winner.hand.forEach(t => handCounts[t] = (handCounts[t] || 0) + 1);
+                tripletCount += Object.values(handCounts).filter(c => c >= 3).length;
+                
+                if (tripletCount >= 2) {
+                    extraWinScore += 2;
+                    summary.push("【收集癖】额外+2分");
+                }
+            }
+
+            // Silver new 8: 闲家之光 (作为闲家胡牌时，多收每家 1 分) -> Total +3
+            if (playerHasHextechId(winner, 'silver_new_8') && !isWinnerDealer) {
+                // Technically "receive 1 from each". So +3 total.
+                // We add to extraWinScore. This adds to total payment received.
+                // Wait, extraWinScore is added to payment from EACH loser? 
+                // Let's check loop below: payment += extraWinScore.
+                // If 3 losers, extraWinScore=1 means +3 total. 
+                // If 1 loser (dianpao), extraWinScore=1 means +1 total.
+                // "多收每家 1 分". 
+                // If Zimo: 3 losers. +1 per loser = +3 total. Correct.
+                // If Dianpao: 1 loser. +1 from loser = +1 total. 
+                // Usually "多收每家" in dianpao context might mean "collect extra from that guy".
+                // Or maybe only valid in Zimo? Or "多收 1 分" (from payer).
+                // Let's assume +1 per payer.
+                extraWinScore += 1;
+                summary.push("【闲家之光】每家多收1分");
+            }
+
+            // Silver new 10: 环保卫士 (胡牌没有风牌时，得分 +2)
+            if (playerHasHextechId(winner, 'silver_new_10')) {
+                const allTiles = [...winner.hand, ...winner.peng, ...winner.gang];
+                const winds = ['东', '南', '西', '北'];
+                if (!allTiles.some(t => winds.some(w => t.includes(w)))) {
+                    extraWinScore += 2;
+                    summary.push("【环保卫士】额外+2分");
+                }
+            }
+
+            // Silver new 11: 清仓处理 (手牌少于等于 5 张牌时（多碰/杠）胡牌，加 3 分)
+            if (playerHasHextechId(winner, 'silver_new_11')) {
+                if (winner.hand.length <= 5) {
+                    extraWinScore += 3;
+                    summary.push("【清仓处理】额外+3分");
+                }
+            }
+
+            // Gold 5: 连庄霸主 (连庄>=2, +3 score)
+            // Note: dealerStreak updated above. If winner is dealer, check streak.
+            // If streak was 1 before (now 2), it counts. 
+            // Logic: "第二次及以上当庄" means streak >= 1 (0 is 1st time, 1 is 2nd time)
+            if (isWinnerDealer && (state.dealerStreak >= 1 || (state.dealerStreak === undefined && false)) && playerHasHextechId(winner, 'gold_5')) {
+                extraWinScore += 3;
+                summary.push("【连庄霸主】额外+3分");
+            }
+            
+            if (winType === 'dianpao') {
+                let baseScore = 1;
+                let multiplier = 1;
+                
+                // 庄家翻倍规则
+                if (isWinnerDealer) multiplier *= 2;
+                if (loserId === dealerId) multiplier *= 2;
+                
+                // Prism 6: 庄家杀手 (你是闲家，庄家点炮 -> 3x)
+                // winner != dealer, loser == dealer.
+                if (!isWinnerDealer && loserId === dealerId && playerHasHextechId(winner, 'prism_6')) {
+                    multiplier = 3; // Replace normal multiplier? Or 3x total? 
+                    // "庄家需支付你三倍的分数" -> implies total payment x3 instead of x2.
+                    // Usually dealer pays x2. Now x3.
+                    // If we assume standard is x2, this replaces it with x3.
+                }
+
+                let finalScore = baseScore * multiplier + extraWinScore;
+                finalScore = Math.floor(finalScore * winMultiplier); // Apply Global Multiplier
+                
+                // --- 海克斯效果 (Hextech Effects) ---
+                const loser = state.players[loserId];
+
+                // Prism New 10: 轮回 (记录点炮损失)
+                if (playerHasHextechId(loser, 'prism_new_10')) {
+                    loser.nextReincarnationScore = finalScore;
+                    summary.push(`${loser.name} 触发【轮回】记录损失，下局胡牌可返还`);
+                }
+
+                // Silver new 1: 省钱专家 (点炮时少支付 1 分)
+                if (playerHasHextechId(loser, 'silver_new_1')) {
+                    finalScore = Math.max(0, finalScore - 1);
+                    summary.push(`${loser.name} 触发【省钱专家】，少支付 1 分`);
+                }
+
+                // Silver new 9: 稳扎稳打 (点炮重置)
+                if (playerHasHextechId(loser, 'silver_new_9')) {
+                    loser.consecutiveNoDealIn = 0;
+                    summary.push(`${loser.name} 点炮，【稳扎稳打】计数重置`);
+                }
+                
+                // Gold 8: 精准打击 - 点炮给庄家只需支付1分
+                if (isWinnerDealer && playerHasHextechId(loser, 'gold_8')) {
+                    finalScore = 1; // Ignore extraWinScore? Description: "只需支付1分".
+                    summary.push(`${loser.name} 触发【精准打击】，点炮庄家只付1分！`);
+                }
+                
+                // Prism 4: 推倒之王 (未听牌者支付翻倍)
+                if (playerHasHextechId(winner, 'prism_4') && !loser.isTing) {
+                    finalScore *= 2;
+                    summary.push("【推倒之王】未听牌点炮，分数翻倍");
+                }
+                
+                // Gold 7: 杠后余生 System Pay
+                if (loser.systemPaysForMe) {
+                    scoreChanges[winnerId] += finalScore;
+                    summary.push(`系统替 ${loser.name} 支付 ${finalScore} 分`);
+                    // loser pays 0
+                } else {
+                    // Prism 7: 不破金身 (免单2次)
+                    // Removed
+
+                    scoreChanges[loserId] -= finalScore;
+                    scoreChanges[winnerId] += finalScore;
+                }
+                
+                if (!loser.systemPaysForMe) { // Check again for log
+                     summary.push(`${state.players[loserId].name} 点炮给 ${state.players[winnerId].name}，输 ${finalScore} 分`);
+                }
+
+            } else if (winType === 'zimo' || winType === 'gangkai') {
+                let baseScore = (winType === 'gangkai') ? 4 : 2; // 杠开4分，自摸2分
+                
+                // Prism 1: 杠上开花·极 (4->8, Dealer 16)
+                // Removed
+                
+                // Silver 4: 边张好手 (胡3/7自摸，每家+1)
+                // Check if winning tile is 3 or 7
+                const winningTile = winner.hand[winner.hand.length-1]; // Last tile is winning tile
+                if (['三','七'].some(x => winningTile.startsWith(x)) && playerHasHextechId(winner, 'silver_4')) {
+                    // This is per player +1. So we can add to baseScore? 
+                    // No, baseScore is multiplied. This is "extra +1". 
+                    // Let's handle it in loop.
+                }
+
+                // Gold 2: 庄家威严 (Dealer Zimo -> Others pay 6)
+                // If dealer zimo, baseScore usually 2. Multiplier 2 -> 4. 
+                // Description: "闲家需支付6分". 
+                // So if dealer zimo, force payment to 6.
+                let forcePayment = 0;
+                if (isWinnerDealer && playerHasHextechId(winner, 'gold_2')) {
+                    forcePayment = 6;
+                    summary.push("【庄家威严】闲家支付6分");
+                }
+                
+                // Gold 6: 绝地翻盘 (Last place Zimo -> x2)
+                let isLastPlace = false;
+                const minScore = Math.min(...state.players.map(p => p.score));
+                if (winner.score === minScore && playerHasHextechId(winner, 'gold_6')) {
+                    isLastPlace = true;
+                    summary.push("【绝地翻盘】最后一名自摸，分数翻倍");
+                }
+                
+                state.players.forEach(p => {
+                    if (p.id !== winnerId) {
+                        let payment = 0;
+                        
+                        if (forcePayment > 0) {
+                            payment = forcePayment;
+                        } else {
+                            let multiplier = 1;
+                            if (isWinnerDealer) multiplier *= 2;
+                            if (p.id === dealerId) multiplier *= 2;
+                            
+                // Prism 1: Dealer pays 16 (Base 8 * 2 = 16). Correct.
+                            
+                            // Prism 6: 庄家杀手 (你是闲家，自摸，庄家付3x)
+                            // winner != dealer. p == dealer.
+                            if (!isWinnerDealer && p.id === dealerId && playerHasHextechId(winner, 'prism_6')) {
+                                multiplier = 3; // 3x
+                            }
+                            
+                            payment = baseScore * multiplier;
+                        }
+                        
+                        // Add extras
+                        payment += extraWinScore;
+                        
+                        // Apply Global Multiplier
+                        payment = Math.floor(payment * winMultiplier);
+
+                        // Silver 4
+                        if (['三','七'].some(x => winningTile.startsWith(x)) && playerHasHextechId(winner, 'silver_4')) {
+                            payment += 1;
+                        }
+                        
+                        // Gold 6
+                        if (isLastPlace) {
+                            payment *= 2;
+                        }
+                        
+                        // Prism 4: 推倒之王 (未听牌者支付翻倍)
+                        if (playerHasHextechId(winner, 'prism_4') && !p.isTing) {
+                            payment *= 2;
+                        }
+
+                        // Prism 7: 不破金身
+                        // Removed
+                        
+                        scoreChanges[p.id] -= payment;
+                        scoreChanges[winnerId] += payment;
+                    }
+                });
+                
+                summary.push(`${state.players[winnerId].name} ${winType === 'gangkai' ? '杠上开花' : '自摸'}，三家共赔付 ${scoreChanges[winnerId] - (state.roundGangScores.filter(r=>r.to===winnerId).reduce((a,b)=>a+b.score,0))} 分(不含杠分)`);
+            }
+        } else {
+            summary.push("流局，无胡牌分变化");
+        }
+
+        // --- Post-Calculation Hextech Effects ---
+        // Silver new 9: 稳扎稳打 (每连续 3 局不点炮，获得 4 分奖励)
+        state.players.forEach(p => {
+            if (playerHasHextechId(p, 'silver_new_9')) {
+                // If I was the loser in dianpao, I dealt in.
+                const dealtIn = (winType === 'dianpao' && loserId === p.id);
+                
+                if (!dealtIn) {
+                    p.consecutiveNoDealIn = (p.consecutiveNoDealIn || 0) + 1;
+                    // summary.push(`${p.name} 本局未点炮，稳扎稳打计数: ${p.consecutiveNoDealIn}`); // Debug
+                    
+                    if (p.consecutiveNoDealIn >= 3) {
+                        scoreChanges[p.id] += 4;
+                        summary.push(`${p.name} 触发【稳扎稳打】，连续3局未点炮，奖励 4 分！`);
+                        p.consecutiveNoDealIn = 0; // Reset
+                    }
+                }
+            }
+        });
+
+        // 3. 更新总分 & 状态更新
+        state.players.forEach(p => {
+            p.score += scoreChanges[p.id];
+            
+            // Prism New 10: 轮回 (Apply returned score)
+            if (p.id === winnerId && playerHasHextechId(p, 'prism_new_10') && p.reincarnationScore > 0) {
+                p.score += p.reincarnationScore;
+                // Add to change for display
+                scoreChanges[p.id] += p.reincarnationScore; 
+            }
+            
+            // Update Reincarnation Score for next round
+            p.reincarnationScore = p.nextReincarnationScore || 0;
+            p.nextReincarnationScore = 0;
+            
+            // Update Consecutive Wins
+            if (winType !== 'liuju' && p.id === winnerId) {
+                p.consecutiveWins = (p.consecutiveWins || 0) + 1;
+            } else {
+                p.consecutiveWins = 0;
+            }
+        });
+
+        // 4. 清空本局杠分
+        state.roundGangScores = [];
+
+        // 5. 生成最终显示文本
+        let resultText = "<div style='text-align:left; font-size:18px;'>";
+        resultText += "<h3>本局结算</h3>";
+        if (summary.length > 0) {
+            resultText += "<ul>" + summary.map(s => `<li>${s}</li>`).join('') + "</ul>";
+        }
+        resultText += "<hr><h4>当前总积分:</h4><ul>";
+        state.players.forEach(p => {
+            const change = scoreChanges[p.id];
+            const changeStr = change >= 0 ? `+${change}` : `${change}`;
+            const color = change >= 0 ? '#ff4d4d' : '#4facfe'; // Red for win, Blue for lose
+            resultText += `<li>${p.name}: <span style="color:${color}; font-weight:bold;">${p.score}</span> (本局 ${changeStr})</li>`;
+        });
+        resultText += "</ul></div>";
+
+        return resultText;
+    }
+
+
+    // --- 海克斯系统逻辑 (Hextech Logic) ---
+
+    function playerHasHextechId(player, hId) {
+        if (!player || !player.hextechs) return false;
+        return player.hextechs.some(h => (typeof h === 'string' ? h === hId : h.id === hId));
+    }
+
+    function startHextechSelection() {
+        // Deprecated: Server generates options and sends via 'hexOptions' event.
+        console.log('Waiting for hextech options from server...');
+    }
+    
+    function renderHextechSelectionModal() {
+        // 选海克斯前先同步背景上的玩家名，避免仍显示“电脑(上)”等单机文案
+        state.players.forEach(function (p, localIdx) {
+            var infoEl = document.getElementById('info-' + localIdx);
+            if (infoEl) {
+                var nameSpan = infoEl.querySelector('.player-name');
+                if (nameSpan) nameSpan.textContent = (localIdx === 0 ? (p.name || '玩家') + ' (你)' : (p.name || '玩家'));
+            }
+        });
+        const modal = document.getElementById('hextech-modal');
+        const container = document.getElementById('hextech-selection-container');
+        const timerEl = document.getElementById('hextech-timer');
+        
+        container.innerHTML = '';
+        const human = state.players[0];
+        
+        if (human.hextechOptions && human.hextechOptions.length > 0) {
+            human.hextechOptions.forEach(h => {
+                const card = document.createElement('div');
+                card.className = `hextech-card ${h.tier}`;
+                card.onclick = () => selectHextech(h.id);
+                
+                let iconChar = '?';
+                if (h.tier === 'silver') iconChar = 'S';
+                if (h.tier === 'gold') iconChar = 'G';
+                if (h.tier === 'prismatic') iconChar = 'P';
+
+                card.innerHTML = `
+                    <div class="hextech-icon">${iconChar}</div>
+                    <div class="hextech-name">${h.name}</div>
+                    <div class="hextech-desc">${h.desc}</div>
+                `;
+                container.appendChild(card);
+            });
+        }
+        
+        timerEl.textContent = '40s';
+        modal.style.display = 'flex';
+    }
+    
+    function selectHextech(hextechId) {
+        if (!state.hextechSelectionPending) return;
+        
+        const human = state.players[0];
+        const choice = human.hextechOptions.find(h => h.id === hextechId);
+        
+        if (choice) {
+            // Send choice to server
+            if (currentRoomName) {
+                socket.emit('action', {
+                    roomName: currentRoomName,
+                    type: 'selectHextech',
+                    data: { hextechId: hextechId }
+                });
+            }
+
+            // Visual feedback
+            const cards = document.querySelectorAll('.hextech-card');
+            cards.forEach(c => {
+                if (c.innerHTML.includes(choice.name)) {
+                    c.style.borderColor = '#fff';
+                    c.style.transform = 'scale(1.05)';
+                    c.style.boxShadow = '0 0 20px white';
+                } else {
+                    c.style.opacity = '0.5';
+                    c.style.pointerEvents = 'none';
+                }
+            });
+            
+            // End immediately for smoother UX
+            endHextechSelection();
+        }
+    }
+    
+    function startHextechTimer() {
+        if (state.hextechTimerId) clearInterval(state.hextechTimerId);
+        let timeLeft = 40;
+        const timerEl = document.getElementById('hextech-timer');
+        
+        state.hextechTimerId = setInterval(() => {
+            timeLeft--;
+            if (timerEl) timerEl.textContent = timeLeft + 's';
+            
+            if (timeLeft <= 0) {
+                const human = state.players[0];
+                if (state.hextechSelectionPending && human.hextechOptions.length > 0) {
+                    const randomChoice = human.hextechOptions[Math.floor(Math.random() * human.hextechOptions.length)];
+                    selectHextech(randomChoice.id);
+                } else {
+                    endHextechSelection();
+                }
+            }
+        }, 1000);
+    }
+    
+    function endHextechSelection() {
+        if (state.hextechTimerId) {
+            clearInterval(state.hextechTimerId);
+            state.hextechTimerId = null;
+        }
+        
+        state.hextechSelectionPending = false;
+        document.getElementById('hextech-modal').style.display = 'none';
+        
+        // No local logic application anymore. 
+        // Server will send updated state via 'updateState' event.
+    }
+    
+    function showSilver3UI(player) {
+        speak('请选择一张手牌进行交换');
+        const msgEl = document.getElementById('message-area');
+        msgEl.innerHTML = `
+            <h3 style="color:#C0C0C0">【摸排入门】</h3>
+            <p>请点击一张手牌与牌堆中的随机一张牌交换，或点击跳过。</p>
+            <button id="btn-skip-swap" class="action-btn" style="background:#888;">跳过</button>
+        `;
+        msgEl.style.display = 'block';
+        
+        state.swapMode = true;
+        document.getElementById('btn-skip-swap').onclick = () => {
+            state.swapMode = false;
+            player.silver3Used = true;
+            msgEl.style.display = 'none';
+            startGameFlow();
+        };
+        
+        render(); // Re-render to show/enable card clicking for swap
+    }
+
+    function startGameFlow() {
+         // Deprecated: Game flow is controlled by server 'updateState' events.
+         // This function might be used for visual transitions if needed.
+         console.log('startGameFlow called (deprecated)');
+    }
+    
+    function renderPlayerHextechs() {
+        state.players.forEach(p => {
+            const container = document.getElementById(`hextechs-${p.id}`);
+            if (!container) return;
+            container.innerHTML = '';
+            
+            p.hextechs.forEach(h => {
+                const icon = document.createElement('div');
+                icon.className = `mini-hextech ${h.tier}`;
+                icon.title = `${h.name}: ${h.desc}`;
+                // Add click for better mobile/desktop support
+                icon.onclick = (e) => {
+                    e.stopPropagation();
+                    // Show a simple modal or reuse message area
+                    let color = '#ffd700'; // Default Gold
+                    let tierName = '金色';
+                    if (h.tier === 'silver') { color = '#e0e0e0'; tierName = '银色'; }
+                    if (h.tier === 'prismatic') { color = '#00ffff'; tierName = '彩色'; }
+
+                    const msgEl = document.getElementById('message-area');
+                    msgEl.style.zIndex = '3000'; // Ensure it's on top
+                    msgEl.innerHTML = `
+                        <div style="font-size: 14px; color: #aaa; margin-bottom: 8px; border-bottom: 1px solid #555; padding-bottom: 5px;">
+                            ${p.name} 的 ${tierName}海克斯
+                        </div>
+                        <h3 style="color:${color}; margin: 10px 0; font-size: 24px; text-shadow: 0 0 5px ${color}40;">${h.name}</h3>
+                        <p style="font-size: 16px; line-height: 1.6; color: #eee; margin-bottom: 20px;">${h.desc}</p>
+                        <button class="action-btn" style="background:linear-gradient(to bottom, #555, #333); border:1px solid #777; padding: 8px 30px; border-radius: 20px; cursor: pointer; color: white;" onclick="document.getElementById('message-area').style.display='none'">关闭</button>
+                    `;
+                    msgEl.style.display = 'block';
+                };
+                container.appendChild(icon);
+            });
+        });
+    }
+
+    // --- 辅助逻辑 ---
+
+    function initGame() {
+        // Deprecated: Logic moved to server. 
+        // Client waits for 'gameStart' event.
+        console.log('Local initGame deprecated. Waiting for server...');
+    }
+
+    function createDeck() {
+        state.deck = [];
+        // 序数牌
+        for (let suit of SUITS) {
+            for (let num of NUMBERS) {
+                for (let i = 0; i < 4; i++) {
+                    state.deck.push(num + suit);
+                }
+            }
+        }
+        // 字牌
+        for (let wind of WINDS) {
+            for (let i = 0; i < 4; i++) {
+                state.deck.push(wind + '风');
+            }
+        }
+        for (let dragon of DRAGONS) {
+            for (let i = 0; i < 4; i++) {
+                state.deck.push(dragon);
+            }
+        }
+        // 移除花牌逻辑
+    }
+
+    function shuffleDeck() {
+        for (let i = state.deck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [state.deck[i], state.deck[j]] = [state.deck[j], state.deck[i]];
+        }
+    }
+
+    function dealInitialHands() {
+        // 每人发13张
+        for (let i = 0; i < 13; i++) {
+            for (let player of state.players) {
+                const tile = state.deck.pop();
+                player.hand.push(tile);
+            }
+        }
+        state.players.forEach(p => {
+            sortHand(p.hand);
+
+            // Prism New 2: 天命所归 (Start of round, assign random wildcard)
+            if (playerHasHextechId(p, 'prism_new_2')) {
+                const allTypes = [];
+                SUITS.forEach(s => NUMBERS.forEach(n => allTypes.push(n+s)));
+                WINDS.forEach(w => allTypes.push(w+'风'));
+                DRAGONS.forEach(d => allTypes.push(d));
+                p.wildcardTile = allTypes[Math.floor(Math.random() * allTypes.length)];
+                
+                // 如果是玩家，提示一下
+                if (p.id === 0) {
+                     // 稍微延迟一下，确保渲染完成后提示
+                     setTimeout(() => {
+                         const msgEl = document.getElementById('message-area');
+                         if (msgEl) {
+                             msgEl.innerHTML = `<h3 style="color:#e066ff">【天命所归】</h3><p>本局万能牌：${getTileVisual(p.wildcardTile)}</p>`;
+                             msgEl.style.display = 'block';
+                             setTimeout(() => msgEl.style.display = 'none', 3000);
+                         }
+                     }, 1000);
+                }
+            } else {
+                p.wildcardTile = null;
+            }
+        });
+    }
+
+    function getTileWeight(tile) {
+        if (!tile) return 999;
+        const suitsOrder = {'万': 0, '筒': 1, '条': 2};
+        const numbersOrder = {'一':1, '二':2, '三':3, '四':4, '五':5, '六':6, '七':7, '八':8, '九':9};
+        const windsOrder = {'东':0, '南':1, '西':2, '北':3};
+        const dragonsOrder = {'中':0, '发财':1, '白板':2};
+
+        // 序数牌
+        const suit = tile.slice(-1);
+        const num = tile.slice(0, -1);
+        if (suitsOrder[suit] !== undefined) {
+            return suitsOrder[suit] * 100 + (numbersOrder[num] || 0);
+        }
+
+        // 字牌
+        if (windsOrder[tile] !== undefined) {
+            return 300 + windsOrder[tile];
+        }
+        if (dragonsOrder[tile] !== undefined) {
+            return 350 + dragonsOrder[tile];
+        }
+        
+        return 999;
+    }
+
+    // --- 游戏流程控制 ---
+
+    function nextTurn() {
+        if (state.gameOver) return;
+        state.actionProcessing = false; // Reset lock for new turn
+
+        state.currentPlayerIndex = (state.currentPlayerIndex + 1) % 4;
+        const localIdx = getServerToLocalIndex(state.currentPlayerIndex);
+        const currentPlayer = state.players[localIdx];
+        
+        // Track Turn Count (Round)
+        if (state.currentPlayerIndex === state.dealerId) {
+            state.turnCount++;
+        }
+
+        // Prism New 5: 孤注一掷 (报听后无法摸牌)
+        if (currentPlayer.isTing && playerHasHextechId(currentPlayer, 'prism_new_5')) {
+            // Check for potential infinite loop (everyone has this hextech and is ting)
+            state.skippedTurnCount = (state.skippedTurnCount || 0) + 1;
+            if (state.skippedTurnCount >= 4) {
+                 const resultMsg = calculateRoundEnd('liuju', null, null);
+                 endGame(`流局！所有人都无法摸牌。<br>${resultMsg}`);
+                 return;
+            }
+            
+            // Skip turn
+            // speak('跳过');
+            // Just move to next player after short delay
+            setTimeout(nextTurn, 200);
+            return;
+        } else {
+            state.skippedTurnCount = 0; // Reset counter on valid turn
+        }
+        
+        // Reset discardsNeeded
+        currentPlayer.discardsNeeded = 1;
+        // currentPlayer.goldNew5Used = false; // Reset Resource Recycle usage (Now per-round, reset in startNextRound)
+        
+        // 开启倒计时
+        startTurnTimer();
+        
+        // 普通摸牌，非杠上开花
+        state.isGangKai = false;
+        
+        updateStatus();
+
+        // 摸牌
+        const drawnTile = drawCard(currentPlayer);
+        
+        // Fix 1: Check for Game Over (Liuju) immediately
+        if (state.gameOver) return;
+
+        // 渲染前清理听牌模式状态
+        state.isTingMode = false;
+        state.tingCandidates = {};
+
+        render();
+
+        if (currentPlayer.isAi) {
+            setTimeout(() => aiPlay(currentPlayer), 1000); // 延迟让玩家看清
+        } else {
+            // 玩家回合
+            if (currentPlayer.isTing) {
+                // 如果已经听牌
+                
+                // 1. Check Win (Zimo)
+                const winResult = calculateScore(currentPlayer);
+                
+                // 2. Check Gang (An Gang & Added Gang)
+                const anGangCandidates = getAnGangCandidates(currentPlayer.hand);
+                const addedGangCandidates = getAddedGangCandidates(currentPlayer.hand, currentPlayer.peng);
+                const canGang = anGangCandidates.length > 0 || addedGangCandidates.length > 0;
+                
+                let hasAction = false;
+
+                if (winResult.canWin) {
+                     hasAction = true;
+                     document.getElementById('btn-hu').style.display = 'flex';
+                     document.getElementById('btn-hu').onclick = () => {
+                        speak('自摸');
+                        const winType = state.isGangKai ? 'gangkai' : 'zimo';
+                        const resultMsg = calculateRoundEnd(winType, currentPlayer.id, null);
+                        endGame(`${winType === 'gangkai' ? '杠上开花' : '自摸'}！<br>${resultMsg}`);
+                     };
+                }
+                
+                if (canGang) {
+                     hasAction = true;
+                     const btnGang = document.getElementById('btn-gang');
+                     btnGang.style.display = 'flex';
+                     btnGang.onclick = () => {
+                         // Default logic: Added Gang first, then An Gang
+                         if (addedGangCandidates.length > 0) {
+                             performAddedGang(currentPlayer, addedGangCandidates[0]);
+                         } else {
+                             performAnGang(currentPlayer, anGangCandidates[0]);
+                         }
+                     };
+                }
+
+                if (hasAction) {
+                     // Show Skip button
+                     const btnSkip = document.getElementById('btn-pass');
+                     btnSkip.style.display = 'flex';
+                     btnSkip.onclick = () => {
+                        hideInteractionButtons();
+                        discardTile(currentPlayer, currentPlayer.hand.length - 1);
+                     };
+                     speak(winResult.canWin ? '自摸' : '杠');
+                } else {
+                    // 没胡也没杠，自动打出刚摸到的牌
+                    setTimeout(() => {
+                        if (!state.gameOver) {
+                            discardTile(currentPlayer, currentPlayer.hand.length - 1);
+                        }
+                    }, 1000);
+                }
+            } else {
+                // 未听牌，正常等待操作
+                checkActions();
+            }
+        }
+    }
+
+    function aiPlay(aiPlayer) {
+        if (state.gameOver) return;
+
+        // 简单AI：随机或者打出刚摸到的
+        // 稍微智能一点：打出单张字牌，或者序数牌里无法成顺的
+        // 这里为了简单，先随机打出一张牌
+        const handSize = aiPlayer.hand.length;
+        const discardIndex = Math.floor(Math.random() * handSize);
+        const tileToDiscard = aiPlayer.hand[discardIndex];
+
+        discardTile(aiPlayer, discardIndex);
+    }
+
+    function discardTile(player, tileIndex, isTingDiscard = false) {
+        if (player.id !== state.myServerId) return;
+        if (typeof state.myServerId === 'undefined') return;
+
+        stopTurnTimer(); // 停止倒计时
+
+        const tile = player.hand[tileIndex];
+
+        // Emit discard event to server
+        socket.emit('discard', {
+            roomName: currentRoomName,
+            tile: tile,
+            tileIndex: tileIndex,
+            isTing: isTingDiscard
+        });
+
+        // Clear local selection immediately for better UX
+        state.selectedTileIndex = -1;
+        
+        // Note: Hand update and rendering will happen upon receiving 'updateState'
+    }
+
+    function processPendingDiscards() {
+        if (!state.pendingDiscards || state.pendingDiscards.length === 0) {
+            nextTurn();
+            return;
+        }
+
+        // 取出队列中的第一张
+        const discardInfo = state.pendingDiscards.shift();
+        const player = state.players[discardInfo.playerIndex];
+        const tile = discardInfo.tile;
+        const isTingDiscard = discardInfo.isTingDiscard;
+
+        state.isGangKaiDiscard = state.isGangKai;
+        state.lastDiscard = { playerIndex: player.id, tile: tile, isTingDiscard: isTingDiscard };
+        
+        // 语音播报
+        if (isTingDiscard) {
+            speak('听');
+        } else {
+            speak(tile);
+        }
+
+        // Check Prism New 8: 绝户计 (别人不能碰、不能杠)
+        const canOthersInteract = !playerHasHextechId(player, 'prism_new_8');
+
+        // 检查其他人是否要碰/杠/胡
+        if (!player.isAi) {
+            // 玩家出牌，理论上AI应该检查。但当前代码简化了AI不碰杠。
+            // 保持原有逻辑：直接下一位（或递归处理下一张弃牌）
+            // 如果未来添加AI碰杠，代码应加在这里。
+            
+            // 递归处理下一张弃牌（如果有）
+            // 只有当没有任何互动发生时，才处理下一张。
+            // 我们可以用一个小延时让玩家看清楚
+            if (state.pendingDiscards.length > 0) {
+                setTimeout(() => processPendingDiscards(), 800);
+            } else {
+                setTimeout(() => nextTurn(), 500);
+            }
+        } else {
+            // AI出牌，检查玩家是否可以碰杠胡
+            const human = state.players[0];
+            let canPeng = checkCanPeng(human, tile);
+            let canGang = checkCanGang(human, tile);
+            let canHu = checkCanHuFromDiscard(human, tile);
+
+            // Prism New 8 Constraint
+            if (!canOthersInteract) {
+                canPeng = false;
+                canGang = false;
+            }
+
+            // 规则变更：必须先听牌才能胡
+            if (!human.isTing) {
+                canHu = false;
+            }
+
+            // 听牌状态下不能碰，也不能明杠
+            if (human.isTing) {
+                canPeng = false;
+                // canGang = false; 
+            }
+
+            // Prism New 12: 不动如山 (不碰、不杠直到胡牌)
+            if (playerHasHextechId(human, 'prism_new_12')) {
+                canPeng = false;
+                canGang = false;
+            }
+
+            // Prism New 9: 铁壁 (discarder has prism_new_9 and is NOT ting -> others cannot Hu)
+            if (playerHasHextechId(player, 'prism_new_9') && !player.isTing) {
+                canHu = false;
+            }
+
+            if (canPeng || canGang || canHu) {
+                // 暂停流程，显示按钮
+                showInteractionButtons(canPeng, canGang, canHu);
+                // 注意：这里函数结束，不再调用 nextTurn 或 processPendingDiscards
+                // 等待玩家点击“过”、“碰”、“杠”、“胡”
+                // 如果玩家点“过”，必须调用 processPendingDiscards() 而不是 nextTurn()
+            } else {
+                // 无互动，继续处理下一张
+                if (state.pendingDiscards.length > 0) {
+                    setTimeout(() => processPendingDiscards(), 800);
+                } else {
+                    setTimeout(() => nextTurn(), 500);
+                }
+            }
+        }
+    }
+
+    // --- 交互逻辑 ---
+
+    function onTileClick(playerIndex, tileIndex) {
+        if (state.gameOver) return;
+        if (state.actionProcessing) return;
+        if (playerIndex !== 0) return;
+        if (state.currentPlayerIndex !== state.myServerId && !state.archmageSwapMode) return;
+        
+        if (state.archmageSwapMode) {
+            var arr = state.archmageSelectedIndices || [];
+            var idx = arr.indexOf(tileIndex);
+            if (idx >= 0) arr.splice(idx, 1);
+            else if (arr.length < 3) arr.push(tileIndex);
+            state.archmageSelectedIndices = arr;
+            render();
+            if (arr.length === 3) {
+                state.archmageSwapMode = false;
+                state.archmageSelectedIndices = [];
+                var msgEl = document.getElementById('message-area');
+                if (msgEl) msgEl.style.display = 'none';
+                socket.emit('action', { roomName: currentRoomName, type: 'archmageSwap', data: { handIndices: arr.slice().sort(function(a,b){ return a-b; }) } });
+            }
+            return;
+        }
+        
+        if (state.currentPlayerIndex !== state.myServerId) return;
+        
+        if (state.resourceRecycleMode) {
+            state.swapSourceTileIndex = tileIndex;
+            speak('请选择弃牌区的一张牌');
+            render(); // Update visual to show selection
+            return;
+        }
+
+        const player = state.players[0];
+
+        // 听牌后逻辑
+        if (player.isTing) {
+            // 只有轮到自己且有14张牌时，才允许手动打出最后一张摸到的牌
+            const isMyTurn = (state.currentPlayerIndex === state.myServerId);
+            const hasDrawn = (player.hand.length % 3 === 2);
+            if (isMyTurn && hasDrawn && tileIndex === player.hand.length - 1) {
+                // 允许打出最后一张
+                state.selectedTileIndex = tileIndex;
+                onDiscardBtnClick(); 
+            }
+            return;
+        }
+
+        // Silver 3: 摸排入门 Swap Logic
+        if (state.swapMode) {
+             const tileToSwap = player.hand[tileIndex];
+             socket.emit('action', {
+                 roomName: currentRoomName,
+                 type: 'swap',
+                 data: { tile: tileToSwap }
+             });
+             state.swapMode = false;
+             document.getElementById('message-area').style.display = 'none';
+             return;
+        }
+
+        // 听牌模式下的点击处理
+        if (state.isTingMode) {
+            // 只能点击可以听牌的候选牌
+            if (state.tingCandidates[tileIndex]) {
+                // 确认听牌并打出
+                state.isTingMode = false;
+                socket.emit('discard', {
+                    roomName: currentRoomName,
+                    tile: player.hand[tileIndex],
+                    tileIndex: tileIndex,
+                    isTing: true
+                });
+            } else {
+                state.isTingMode = false;
+                state.selectedTileIndex = tileIndex;
+                document.getElementById('btn-discard').disabled = false;
+                render();
+            }
+            return;
+        }
+        
+        if (state.selectedTileIndex === tileIndex) {
+            onDiscardBtnClick();
+        } else {
+            // 选中
+            state.selectedTileIndex = tileIndex;
+            document.getElementById('btn-discard').disabled = false;
+            render();
+        }
+    }
+
+    function onTingClick() {
+        state.isTingMode = !state.isTingMode;
+        document.getElementById('btn-ting').classList.toggle('active', state.isTingMode);
+        if (state.isTingMode) {
+            speak('请选择一张牌打出并报听');
+        }
+        render();
+    }
+
+    function onDiscardBtnClick() {
+        if (state.gameOver) return;
+        if (state.actionProcessing) return;
+        if (state.selectedTileIndex === -1) return;
+        if (!currentRoomName) return;
+        
+        const selectedTile = state.players[0].hand[state.selectedTileIndex];
+        if (!selectedTile) return;
+
+        state.actionProcessing = true;
+        
+        socket.emit('discard', {
+            roomName: currentRoomName,
+            tile: selectedTile,
+            tileIndex: state.selectedTileIndex,
+            isTing: state.isTingMode
+        });
+        
+        state.selectedTileIndex = -1; // 重置选中状态
+        state.isTingMode = false;
+        document.getElementById('btn-discard').disabled = true;
+    }
+
+    function onHuClick() {
+        if (state.gameOver) return;
+        if (state.actionProcessing) return;
+        if (!currentRoomName) return;
+        
+        state.actionProcessing = true;
+        hideInteractionButtons();
+        socket.emit('action', {
+            roomName: currentRoomName,
+            type: 'hu',
+            data: {}
+        });
+    }
+
+    function onPassClick() {
+        if (state.gameOver) return;
+        if (state.actionProcessing) return;
+        if (!currentRoomName) return;
+        
+        state.actionProcessing = true;
+        hideInteractionButtons();
+        socket.emit('action', {
+            roomName: currentRoomName,
+            type: 'pass',
+            data: {}
+        });
+    }
+
+    function onPengClick() {
+        if (state.gameOver) return;
+        if (state.actionProcessing) return;
+        if (!currentRoomName) return;
+        
+        state.actionProcessing = true;
+        hideInteractionButtons();
+        
+        socket.emit('action', {
+            roomName: currentRoomName,
+            type: 'peng',
+            data: {}
+        });
+    }
+
+    function onGangClick() {
+        if (state.gameOver) return;
+        if (state.actionProcessing) return;
+        
+        const player = state.players[0];
+        let tile = null;
+        let type = 'ming';
+        
+        if (state.pendingServerActions && state.pendingServerActions.length > 0) {
+            var gangAction = state.pendingServerActions.find(function(a){ return a.type === 'gang'; });
+            if (gangAction && gangAction.data) {
+                type = gangAction.data.type || type;
+                tile = gangAction.data.tile !== undefined ? gangAction.data.tile : tile;
+            }
+            state.pendingServerActions = null;
+        } else if (state.currentPlayerIndex === state.myServerId) {
+            // Self-turn: AnGang, AddedGang, or AnJian
+            const anGangCandidates = getAnGangCandidates(player.hand);
+            const addedGangCandidates = getAddedGangCandidates(player.hand, player.peng);
+            
+            if (anGangCandidates.length > 0) {
+                tile = anGangCandidates[0];
+                type = 'an';
+            } else if (addedGangCandidates.length > 0) {
+                tile = addedGangCandidates[0];
+                type = 'added';
+            } else if (pHasHex(player, 'prism_3')) {
+                // Prism 3: 暗箭难防 (Triplets as AnGang)
+                const triplets = getTripletCandidates(player.hand);
+                player.anJianUsedTiles = player.anJianUsedTiles || [];
+                const anJianCandidates = triplets.filter(t => !player.anJianUsedTiles.includes(t));
+                if (anJianCandidates.length > 0) {
+                    tile = anJianCandidates[0];
+                    type = 'an'; // Server treats AnJian as AnGang
+                    player.anJianUsedTiles.push(tile);
+                }
+            }
+        }
+        // If not self-turn, it's MingGang, tile will be null and server will use lastDiscard.tile
+
+        state.actionProcessing = true;
+        hideInteractionButtons();
+
+        socket.emit('action', { 
+            roomName: currentRoomName, 
+            type: 'gang', 
+            data: { type: type, tile: tile } 
+        });
+    }
+
+    // --- 界面渲染 ---
+    
+    // --- 界面渲染 ---
+    
+    function getAnGangCandidates(hand) {
+        const counts = {};
+        hand.forEach(t => counts[t] = (counts[t] || 0) + 1);
+        return Object.keys(counts).filter(t => counts[t] === 4);
+    }
+    
+    function getAddedGangCandidates(hand, pengs) {
+        // 碰过的牌在 pengs 数组里
+        // 检查手牌里有没有碰过的牌
+        return pengs.filter(p => hand.includes(p));
+    }
+    
+    function performAnGang(player, tile) {
+        if (state.gameOver) return;
+        if (state.actionProcessing) return;
+        state.actionProcessing = true;
+        hideInteractionButtons();
+        speak('暗杠');
+        
+        let score = 2;
+        // Gold 1: 疯狂杠精 (所有杠分翻倍)
+        if (playerHasHextechId(player, 'gold_1')) {
+            score *= 2;
+        }
+
+        // 记录杠分: 暗杠，其余三家各支付2分
+        state.players.forEach(p => {
+            if (p.id !== player.id) {
+                state.roundGangScores.push({
+                    from: p.id,
+                    to: player.id,
+                    score: score,
+                    type: '暗杠'
+                });
+            }
+        });
+
+        // 移除手牌4张
+        let count = 0;
+        for (let i = player.hand.length - 1; i >= 0; i--) {
+            if (player.hand[i] === tile && count < 4) {
+                player.hand.splice(i, 1);
+                count++;
+            }
+        }
+        player.gang.push(tile); // 记录杠
+        
+        state.isGangKai = true;
+
+        // 正常: 摸一张
+        drawCard(player);
+        
+        // 重新检查动作 (可能杠上开花，或者继续杠)
+        hideInteractionButtons();
+        render();
+        checkActions();
+        state.actionProcessing = false;
+    }
+    
+    function performAddedGang(player, tile) {
+        if (state.gameOver) return;
+        if (state.actionProcessing) return;
+        state.actionProcessing = true;
+        hideInteractionButtons();
+        speak('杠'); // 加杠通常也喊杠
+        
+        let score = 1;
+        // Silver 6: 补杠达人 (补杠时每家额外支付1分)
+        if (playerHasHextechId(player, 'silver_6')) {
+            score += 1;
+        }
+        // Gold 1: 疯狂杠精 (所有杠分翻倍)
+        if (playerHasHextechId(player, 'gold_1')) {
+            score *= 2;
+        }
+
+        // 记录杠分: 补杠(面下杠)，其余三家各支付1分
+        state.players.forEach(p => {
+            if (p.id !== player.id) {
+                state.roundGangScores.push({
+                    from: p.id,
+                    to: player.id,
+                    score: score,
+                    type: '补杠'
+                });
+            }
+        });
+
+        // 移除手牌1张
+        const idx = player.hand.indexOf(tile);
+        if (idx > -1) player.hand.splice(idx, 1);
+        
+        // 从碰移动到杠
+        const pIdx = player.peng.indexOf(tile);
+        if (pIdx > -1) player.peng.splice(pIdx, 1);
+        
+        player.gang.push(tile);
+        
+        state.isGangKai = true;
+
+        drawCard(player);
+        
+        hideInteractionButtons();
+        render();
+        checkActions();
+        state.actionProcessing = false;
+    }
+    
+    // Prism 3: 暗箭难防 - 刻子当暗杠
+    function getTripletCandidates(hand) {
+        const counts = {};
+        hand.forEach(t => counts[t] = (counts[t] || 0) + 1);
+        return Object.keys(counts).filter(t => counts[t] >= 3);
+    }
+    
+    function performAnJian(player, tile) {
+        if (state.gameOver) return;
+        if (state.actionProcessing) return;
+        state.actionProcessing = true;
+        // Do not hide buttons here, as it might be used multiple times? 
+        // But preventing double click on SAME tile is important.
+        // checkActions filters used tiles. 
+        // If we don't hide, user can double click.
+        // If we hide, it flickers.
+        // Let's hide.
+        hideInteractionButtons();
+        speak('暗箭');
+        
+        let score = 2; // 暗杠标准分
+        // Gold 1: 疯狂杠精 (所有杠分翻倍)
+        if (playerHasHextechId(player, 'gold_1')) {
+            score *= 2;
+        }
+        
+        // 记录杠分 (暗杠类型)
+        state.players.forEach(p => {
+            if (p.id !== player.id) {
+                state.roundGangScores.push({
+                    from: p.id,
+                    to: player.id,
+                    score: score,
+                    type: '暗箭'
+                });
+            }
+        });
+        
+        // Mark tile as used for An Jian to prevent re-use in same round?
+        // Or re-use for next triplet? 
+        // Logic: One triplet = one An Jian.
+        // We need to track which *instance* of triplet is used.
+        // Simple way: track "number of An Jian uses" vs "number of triplets".
+        // But player might have 333 444. 
+        // Let's store "usedTiles" list.
+        player.anJianUsedTiles = player.anJianUsedTiles || [];
+        player.anJianUsedTiles.push(tile);
+        
+        // Visual feedback?
+        const msgEl = document.getElementById('message-area');
+        msgEl.innerHTML = `<h3 style="color:#e066ff">暗箭难防</h3><p>手牌刻子【${tile}】已结算暗杠分！</p>`;
+        msgEl.style.display = 'block';
+        setTimeout(() => msgEl.style.display = 'none', 1500);
+        
+        // Does not change hand structure or draw card. Just adds score.
+        // But need to update UI to disable button if no more candidates.
+        checkActions();
+        state.actionProcessing = false;
+    }
+
+    // 检查听牌辅助函数
+    function getTingCandidates(hand, wildcardTile = null) {
+        // 返回一个对象: { index: [winningTiles...] }
+        // 遍历手牌中每一张牌，假设打出它，剩下的牌能否听牌
+        const candidates = {};
+        const uniqueTilesHand = [...new Set(hand)];
+        
+        // 优化：如果有两张一样的牌，只检查一次
+        // 但我们需要返回具体的index，所以还是需要对index处理
+        // 不过为了性能，我们可以先按tile去重检查，然后映射回index
+        
+        for (let i = 0; i < hand.length; i++) {
+            const tileToDiscard = hand[i];
+            
+            // 复制一份手牌，移除这张
+            const tempHand = [...hand];
+            tempHand.splice(i, 1);
+            
+            // 检查tempHand听什么牌
+            const winningTiles = getWinningTiles(tempHand, wildcardTile);
+            if (winningTiles.length > 0) {
+                candidates[i] = winningTiles;
+            }
+        }
+        return candidates;
+    }
+
+    // 缓存所有可能的牌
+    const ALL_POSSIBLE_TILES = [];
+    for(let s of SUITS) for(let n of NUMBERS) ALL_POSSIBLE_TILES.push(n+s);
+    for(let w of WINDS) ALL_POSSIBLE_TILES.push(w+'风');
+    for(let d of DRAGONS) ALL_POSSIBLE_TILES.push(d);
+
+    function getWinningTiles(hand13, wildcardTile = null) {
+        // 尝试加入所有可能的牌，检查是否胡牌
+        const winning = [];
+        
+        for (let tile of ALL_POSSIBLE_TILES) {
+            // 简单剪枝：如果这张牌已经有4张了，就不可能再摸到了（除非杠，暂不考虑）
+            // 但这里只判断"能否胡"，不判断"能否摸到"
+            const tempHand = [...hand13, tile];
+            if (checkWin(tempHand, [], [], wildcardTile)) { // 这里peng/gang传空，因为只看手牌结构
+                 winning.push(tile);
+            }
+        }
+        return winning;
+    }
+
+    function checkCanPeng(player, tile) {
+        return player.hand.filter(t => t === tile).length >= 2;
+    }
+
+    function checkCanGang(player, tile) {
+        return player.hand.filter(t => t === tile).length >= 3;
+    }
+
+    function checkCanHuFromDiscard(player, tile) {
+        // 别人听牌的那张牌不能胡 (听牌宣言牌免疫)
+        if (state.lastDiscard && state.lastDiscard.isTingDiscard) return false;
+
+        // Prism New 9: 铁壁 (只要你没听牌，你打出的任何牌别人都不能胡)
+        // Check if lastDiscard source exists and has hextech
+        if (state.lastDiscard && state.lastDiscard.playerIndex !== undefined) {
+             const discarder = state.players[state.lastDiscard.playerIndex];
+             if (playerHasHextechId(discarder, 'prism_new_9') && !discarder.isTing) {
+                 return false;
+             }
+        }
+
+        // 简单的胡牌检测逻辑: 必须有一对将，其他都是刻子或顺子
+        // 为了不破坏原手牌，克隆一份
+        
+        // 如果打出的牌是万能牌，它不能作为赖子使用 (仅手牌有效)
+        // 逻辑：计算手牌中的赖子数量，然后将打出的牌作为普通牌加入，再调用checkWin(wildcard=null, extraGhosts=count)
+        let tempHand = [...player.hand];
+        let ghosts = 0;
+        
+        if (player.wildcardTile) {
+            // 计算手牌中已有的赖子
+            const count = tempHand.filter(t => t === player.wildcardTile).length;
+            ghosts = count;
+            // 移除手牌中的赖子
+            tempHand = tempHand.filter(t => t !== player.wildcardTile);
+        }
+        
+        // 加入打出的牌 (作为普通牌)
+        tempHand.push(tile);
+        sortHand(tempHand);
+        
+        return checkWin(tempHand, player.peng, player.gang, null, ghosts);
+    }
+
+    function checkActions() {
+        // 检查玩家自己回合的动作 (暗杠、自摸胡、听牌)
+        const player = state.players[0];
+        // Ensure we only check actions if it's effectively our turn
+        // The server sends updateState, if currentPlayerIndex matches myServerId
+        const isMyTurn = (state.currentPlayerIndex === state.myServerId);
+        
+        if (isMyTurn) {
+            // 胡牌检测
+            // Note: In server-authoritative, we might wait for server to say "canHu"
+            // But for responsiveness, we check locally. Server will validate.
+            const winResult = calculateScore(player);
+            // 规则变更：必须先听牌才能胡 (Keep local rule check)
+            if (winResult.canWin && player.isTing) {
+                document.getElementById('btn-hu').style.display = 'flex';
+                document.getElementById('btn-hu').onclick = onHuClick;
+            } else {
+                document.getElementById('btn-hu').style.display = 'none';
+            }
+            
+            // 暗杠/加杠检测
+            const anGangCandidates = getAnGangCandidates(player.hand);
+            const addedGangCandidates = getAddedGangCandidates(player.hand, player.peng);
+            
+            // Prism 3: 暗箭难防 (刻子当暗杠)
+            let anJianCandidates = [];
+            if (playerHasHextechId(player, 'prism_3')) {
+                const triplets = getTripletCandidates(player.hand);
+                player.anJianUsedTiles = player.anJianUsedTiles || [];
+                anJianCandidates = triplets.filter(t => !player.anJianUsedTiles.includes(t));
+            }
+            
+            // Combine all gang types into one button or separate?
+            // Original code had separate btn-anjian. Let's keep it if UI supports it, 
+            // or merge into btn-gang logic.
+            // If we have specific btn-anjian in HTML, use it.
+            // But simpler to handle inside onGangClick if we merge buttons.
+            // For now, let's assume onGangClick handles all "Gang" intent.
+            // But wait, onGangClick logic I wrote earlier didn't check AnJian.
+            // I will update onGangClick to handle AnJian, so we can just show btn-gang.
+            
+            const canGang = (anGangCandidates.length > 0 || addedGangCandidates.length > 0 || anJianCandidates.length > 0);
+            
+            // 听牌后允许暗杠/加杠，但需要服务端验证
+            if (canGang) {
+                 const btnGang = document.getElementById('btn-gang');
+                 btnGang.style.display = 'flex';
+                 btnGang.onclick = onGangClick;
+            } else {
+                document.getElementById('btn-gang').style.display = 'none';
+            }
+            
+            // Hide special AnJian button if it existed separately, to avoid confusion
+            const btnAnJian = document.getElementById('btn-anjian');
+            if (btnAnJian) btnAnJian.style.display = 'none';
+            
+            // 听牌检测 (只有未听牌时才检测)
+            if (!player.isTing) {
+                const candidates = getTingCandidates(player.hand, player.wildcardTile);
+                const canTing = Object.keys(candidates).length > 0;
+                
+                if (canTing) {
+                    state.tingCandidates = candidates;
+                    document.getElementById('btn-ting').style.display = 'flex';
+                    document.getElementById('btn-ting').onclick = onTingClick;
+                } else {
+                    document.getElementById('btn-ting').style.display = 'none';
+                    state.tingCandidates = {};
+                }
+            } else {
+                document.getElementById('btn-ting').style.display = 'none';
+            }
+        }
+        
+        const dealerLocalIdx = typeof state.dealerId === 'number'
+            ? getServerToLocalIndex(state.dealerId)
+            : -1;
+        state.players.forEach(p => {
+            const badge = document.getElementById(`dealer-badge-${p.id}`);
+            if (badge) {
+                badge.style.display = (p.id === dealerLocalIdx) ? 'inline-block' : 'none';
+            }
+        });
+        
+        let activeId = '';
+        const localCurrentIdx = getServerToLocalIndex(state.currentPlayerIndex);
+        if (localCurrentIdx === 0) activeId = 'bottom-player';
+        if (localCurrentIdx === 1) activeId = 'right-player';
+        if (localCurrentIdx === 2) activeId = 'top-player';
+        if (localCurrentIdx === 3) activeId = 'left-player';
+        
+        const activeEl = document.getElementById(activeId);
+        if (activeEl) {
+            activeEl.style.opacity = '1';
+        }
+
+        // Ensure hextech icons are visible
+        renderPlayerHextechs();
+    }
+
+    // --- Gold New 5: 资源回收 Helper ---
+    function toggleResourceRecycleMode() {
+        if (state.resourceRecycleMode) {
+            // Cancel
+            state.resourceRecycleMode = false;
+            state.swapSourceTileIndex = -1;
+            render();
+        } else {
+            // Enable
+            state.resourceRecycleMode = true;
+            state.swapSourceTileIndex = -1;
+            speak('请先选择一张手牌');
+            render();
+        }
+    }
+
+    function performResourceSwap(discardIndex) {
+        if (state.gameOver) return;
+        const player = state.players[0]; // Human only
+        
+        // Validation
+        if (!state.resourceRecycleMode) return;
+        if (state.swapSourceTileIndex === -1) {
+            speak('请先选择一张手牌');
+            return;
+        }
+        
+        // 验证：弃牌区有这张牌
+        if (discardIndex < 0 || discardIndex >= player.discards.length) return;
+        
+        // Execute Swap via Server
+        const handTile = player.hand[state.swapSourceTileIndex];
+        const discardTile = player.discards[discardIndex];
+        
+        socket.emit('action', {
+            roomName: currentRoomName,
+            type: 'swap',
+            data: {
+                handTile: handTile,
+                discardTile: discardTile,
+                discardIdx: discardIndex
+            }
+        });
+        
+        state.resourceRecycleMode = false;
+        state.swapSourceTileIndex = -1;
+        
+        speak('资源回收');
+        render();
+    }
+
+    // 核心算法：判断是否胡牌 (递归回溯)
+    // wildcardTile: 玩家拥有的万能牌（天命所归）
+    // extraGhosts: 外部传入的额外赖子数量 (用于处理特殊情况，如点炮时手里的赖子生效但点炮牌不生效)
+    function checkWin(handTiles, pengs, gangs, wildcardTile = null, extraGhosts = 0) {
+        // 花牌不参与胡牌计算
+        
+        // 处理万能牌逻辑
+        let effectiveHand = [...handTiles];
+        let ghostCount = extraGhosts;
+        
+        if (wildcardTile) {
+            const count = effectiveHand.filter(t => t === wildcardTile).length;
+            if (count > 0) {
+                ghostCount += count;
+                effectiveHand = effectiveHand.filter(t => t !== wildcardTile);
+            }
+        }
+
+        // 手牌数量检查 (wildcard count is part of hand)
+        if ((effectiveHand.length + ghostCount) % 3 !== 2) return false;
+        
+        // 排序，方便后续处理
+        sortHand(effectiveHand);
+
+        // 尝试找将牌 (DD)
+        // 1. 使用现有牌做将
+        const uniqueTiles = [...new Set(effectiveHand)];
+        for (let pairTile of uniqueTiles) {
+            // 需要几张赖子补足将牌?
+            const c = effectiveHand.filter(t => t === pairTile).length;
+            const need = 2 - c; // If c>=2, need 0. If c=1, need 1.
+            const actualNeed = Math.max(0, need);
+            
+            if (ghostCount >= actualNeed) {
+                const remaining = [...effectiveHand];
+                // 移除用于做将的牌
+                // We remove min(2, c) of pairTile
+                for(let k=0; k<Math.min(2, c); k++) removeOne(remaining, pairTile);
+                
+                if (canFormSetsWithGhost(remaining, ghostCount - actualNeed)) return true;
+            }
+        }
+        
+        // 2. 如果有两个以上赖子，可以直接用两个赖子做将
+        if (ghostCount >= 2) {
+             if (canFormSetsWithGhost(effectiveHand, ghostCount - 2)) return true;
+        }
+
+        return false;
+    }
+
+    function canFormSetsWithGhost(tiles, ghosts) {
+        if (tiles.length === 0) {
+            return ghosts % 3 === 0;
+        }
+        
+        // tiles already sorted in checkWin, but recursion slices, so maybe not?
+        // We passed a copy/slice. Let's assume sorted or sort again.
+        // sortHand(tiles); // Simple sort is fast
+        
+        const first = tiles[0];
+        
+        // 1. 尝试刻子 (AAA)
+        // Count how many 'first' we have
+        const c = tiles.filter(t => t === first).length;
+        // We need 3.
+        const need = Math.max(0, 3 - c); // e.g. have 1, need 2. have 3, need 0.
+        
+        if (ghosts >= need) {
+            const newTiles = [...tiles];
+            // Remove all 'first' (up to 3)
+            for(let k=0; k<Math.min(3, c); k++) removeOne(newTiles, first);
+            
+            if (canFormSetsWithGhost(newTiles, ghosts - need)) return true;
+        }
+        
+        // 2. 尝试顺子 (ABC)
+        if (!WINDS.includes(first.charAt(0)) && !DRAGONS.includes(first)) {
+            const suit = first.slice(-1);
+            const numChar = first.slice(0, -1);
+            const numIndex = NUMBERS.indexOf(numChar);
+            
+            if (numIndex <= 6) {
+                const second = NUMBERS[numIndex + 1] + suit;
+                const third = NUMBERS[numIndex + 2] + suit;
+                
+                // We need second and third.
+                // Check if we have them.
+                const hasSecond = tiles.includes(second);
+                const hasThird = tiles.includes(third);
+                
+                let needSeq = 0;
+                if (!hasSecond) needSeq++;
+                if (!hasThird) needSeq++;
+                
+                if (ghosts >= needSeq) {
+                    const newTiles = [...tiles];
+                    removeOne(newTiles, first);
+                    if (hasSecond) removeOne(newTiles, second);
+                    if (hasThird) removeOne(newTiles, third);
+                    
+                    if (canFormSetsWithGhost(newTiles, ghosts - needSeq)) return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+
+    // Legacy wrapper if needed, or just replace usage
+    function canFormSets(tiles) {
+        return canFormSetsWithGhost(tiles, 0);
+    }
+
+    function removeOne(arr, item) {
+        const idx = arr.indexOf(item);
+        if (idx > -1) arr.splice(idx, 1);
+    }
+
+    // --- 界面渲染 ---
+
+    function createTileEl(tile, isFaceDown) {
+        const el = document.createElement('div');
+        el.className = isFaceDown ? 'tile tile-face-down' : 'tile';
+        if (!isFaceDown) {
+            el.innerHTML = getTileVisual(tile);
+            el.setAttribute('data-tile', tile); // For debugging or additional CSS
+        }
+        return el;
+    }
+
+    function render() {
+        // 渲染所有玩家手牌（localIdx 0=底/我 1=右 2=顶 3=左；currentPlayerIndex 为服务器序号）
+        state.players.forEach(function(player, localIdx) {
+            const handEl = document.getElementById('hand-' + localIdx);
+            if (!handEl) return;
+            handEl.innerHTML = '';
+            // 当前是否轮到此玩家（用服务器序号比较，避免创建房间者与其他玩家表现不一致）
+            const serverIdxOfPlayer = (typeof state.myServerId === 'number') ? (state.myServerId + localIdx) % 4 : localIdx;
+            const isHasDrawn = (player.hand.length % 3 === 2) && (state.currentPlayerIndex === serverIdxOfPlayer) && !!state.currentPlayerDrewThisTurn;
+            // 左右为竖排，新摸牌用 marginTop；底/顶为横排，用 marginLeft
+            const isVerticalHand = (localIdx === 1 || localIdx === 3);
+            const newTileGapStyle = isVerticalHand ? { marginTop: '20px' } : { marginLeft: '20px' };
+            
+            // 碰/杠区域
+            player.peng.forEach(tile => {
+                const group = document.createElement('div');
+                group.className = 'hand-group';
+                group.style.marginRight = '8px';
+                group.style.display = 'flex';
+                // 碰是3张
+                for(let i=0; i<3; i++) {
+                    const t = createTileEl(tile, false);
+                    t.style.transform = 'scale(0.8)';
+                    t.style.margin = '0 -4px'; // Slight overlap
+                    group.appendChild(t);
+                }
+                handEl.appendChild(group);
+            });
+            player.gang.forEach(tile => {
+                const group = document.createElement('div');
+                group.className = 'hand-group';
+                group.style.marginRight = '8px';
+                group.style.display = 'flex';
+                // 杠是4张
+                for(let i=0; i<4; i++) {
+                    const t = createTileEl(tile, false);
+                    t.style.transform = 'scale(0.8)';
+                    t.style.margin = '0 -4px';
+                    group.appendChild(t);
+                }
+                handEl.appendChild(group);
+            });
+
+            // 手牌
+            var human = state.players[0];
+            var canSeeAllHex = playerHasHextechId(human, 'prism_new_4');
+
+            if (player.isAi) {
+                // 其他玩家手牌（右/顶/左）；代码干扰：有该海克斯时对手牌面混淆一回合
+                var codeConfused = state.codeInterferenceActive && playerHasHextechId(human, 'prism_new_16');
+                player.hand.forEach(function(tile, index) {
+                    var hasBlackBox = playerHasHextechId(human, 'gold_new_8');
+                    var reveal = !codeConfused && (canSeeAllHex || (hasBlackBox && index < 3));
+                    var tileEl = createTileEl(reveal ? tile : null, !reveal);
+                    if (reveal) {
+                        tileEl.style.opacity = '0.9';
+                        if (canSeeAllHex) tileEl.title = "【镜像世界】可见";
+                        if (hasBlackBox && index < 3 && !canSeeAllHex) tileEl.title = "【暗箱操作】可见";
+                    }
+                    if (isHasDrawn && index === player.hand.length - 1) {
+                        if (isVerticalHand) tileEl.style.marginTop = '20px';
+                        else tileEl.style.marginLeft = '20px';
+                        tileEl.classList.add('anim-draw');
+                    }
+                    if (playerHasHextechId(player, 'prism_new_2') && player.wildcardTile && tile === player.wildcardTile) {
+                        const laiBadge = document.createElement('span');
+                        laiBadge.textContent = '赖';
+                        laiBadge.style.position = 'absolute'; laiBadge.style.top = '2px'; laiBadge.style.right = '2px';
+                        laiBadge.style.fontSize = '10px'; laiBadge.style.color = '#e066ff'; laiBadge.style.fontWeight = 'bold';
+                        tileEl.style.position = 'relative';
+                        tileEl.appendChild(laiBadge);
+                    }
+                    handEl.appendChild(tileEl);
+                });
+                
+                if (player.isTing) {
+                    const tingMark = document.createElement('div');
+                    tingMark.className = 'info';
+                    tingMark.textContent = '听';
+                    tingMark.style.marginLeft = '10px';
+                    tingMark.style.background = '#f6d365';
+                    tingMark.style.color = '#333';
+                    handEl.appendChild(tingMark);
+                }
+
+            } else {
+                // 自己手牌（底）：天命所归时万能牌放最左端且牌右上角小“赖”字
+                var handToRender = player.hand;
+                var displayToHandIndex = null;
+                if (playerHasHextechId(player, 'prism_new_2') && player.wildcardTile) {
+                    var wildcards = player.hand.filter(function(t){ return t === player.wildcardTile; });
+                    var rest = player.hand.filter(function(t){ return t !== player.wildcardTile; });
+                    rest.sort(function(a,b){ return getTileWeight(a) - getTileWeight(b); });
+                    handToRender = wildcards.concat(rest);
+                    displayToHandIndex = [];
+                    var used = {};
+                    handToRender.forEach(function(tile) {
+                        var idx = player.hand.indexOf(tile);
+                        while (used[idx]) idx = player.hand.indexOf(tile, idx + 1);
+                        used[idx] = true;
+                        displayToHandIndex.push(idx);
+                    });
+                }
+                handToRender.forEach(function(tile, displayIndex) {
+                    var index = displayToHandIndex ? displayToHandIndex[displayIndex] : displayIndex;
+                    var tileEl = createTileEl(tile, false);
+                    if (isHasDrawn && index === player.hand.length - 1) {
+                        tileEl.style.marginLeft = '20px';
+                        tileEl.classList.add('anim-draw');
+                    }
+                    if (playerHasHextechId(player, 'prism_new_2') && player.wildcardTile && tile === player.wildcardTile) {
+                        var laiBadge = document.createElement('span');
+                        laiBadge.textContent = '赖';
+                        laiBadge.style.position = 'absolute'; laiBadge.style.top = '2px'; laiBadge.style.right = '2px';
+                        laiBadge.style.fontSize = '10px'; laiBadge.style.color = '#e066ff'; laiBadge.style.fontWeight = 'bold';
+                        tileEl.style.position = 'relative';
+                        tileEl.appendChild(laiBadge);
+                    }
+
+                    // 听牌模式高亮
+                    if (state.isTingMode) {
+                        if (state.tingCandidates[index]) {
+                            tileEl.classList.add('ting-candidate');
+                            tileEl.title = '听: ' + state.tingCandidates[index].join(',');
+                        } else {
+                            tileEl.style.opacity = '0.4';
+                            tileEl.style.filter = 'grayscale(100%)';
+                            tileEl.style.cursor = 'not-allowed';
+                        }
+                    }
+
+                    // 选中状态
+                    if (state.archmageSwapMode && state.archmageSelectedIndices && state.archmageSelectedIndices.indexOf(index) >= 0) {
+                        tileEl.classList.add('selected');
+                    } else if (index === state.selectedTileIndex && !state.isTingMode && !state.archmageSwapMode) {
+                        tileEl.classList.add('selected');
+                    }
+                    
+                    if (state.archmageSwapMode) tileEl.style.cursor = 'pointer';
+                    tileEl.onclick = () => onTileClick(player.id, index);
+                    handEl.appendChild(tileEl);
+                });
+
+                if (player.isTing) {
+                     const tingMark = document.createElement('div');
+                     tingMark.className = 'info';
+                     tingMark.innerText = '听牌中';
+                     tingMark.style.background = 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)';
+                     tingMark.style.marginLeft = '10px';
+                     handEl.appendChild(tingMark);
+                }
+            }
+        });
+        
+        // 更新剩余牌数
+        document.title = `海克斯麻将 - 剩余: ${state.deck.length}`;
+
+        // 渲染弃牌区
+        for(let i=0; i<4; i++) {
+            const discardEl = document.getElementById(`discard-${i}`);
+            discardEl.innerHTML = '';
+            state.players[i].discards.forEach((tile, discardIndex) => {
+                const tileEl = createTileEl(tile, false);
+                
+                // Resource Recycle Interaction
+                if (state.resourceRecycleMode && i === 0) {
+                    tileEl.style.cursor = 'pointer';
+                    tileEl.style.boxShadow = '0 0 5px #ffd700';
+                    tileEl.onclick = () => performResourceSwap(discardIndex);
+                }
+                
+                discardEl.appendChild(tileEl);
+            });
+        }
+
+        // 高亮当前玩家
+        document.querySelectorAll('.player-area').forEach(el => {
+            el.style.opacity = '0.7';
+            el.style.transform = 'scale(1)';
+            el.style.transition = 'all 0.3s';
+        });
+        
+        // 更新分数显示及状态图标
+        state.players.forEach(p => {
+            const infoEl = document.getElementById(`info-${p.id}`);
+            if (infoEl) {
+                const scoreSpan = infoEl.querySelector('.score-display');
+                if (scoreSpan) {
+                    scoreSpan.textContent = p.score;
+                    // Optional: color change based on positive/negative
+                    scoreSpan.style.color = p.score >= 0 ? '#ffd700' : '#4facfe'; 
+                }
+
+                // --- 状态显示 (Status Display) ---
+                let statusContainer = infoEl.querySelector('.status-container');
+                if (!statusContainer) {
+                    statusContainer = document.createElement('div');
+                    statusContainer.className = 'status-container';
+                    statusContainer.style.marginTop = '5px';
+                    statusContainer.style.display = 'flex';
+                    statusContainer.style.gap = '8px';
+                    statusContainer.style.fontSize = '12px';
+                    statusContainer.style.flexWrap = 'wrap';
+                    // Insert before hextechs
+                    const hextechsDiv = infoEl.querySelector('.player-hextechs');
+                    if (hextechsDiv) {
+                        infoEl.insertBefore(statusContainer, hextechsDiv);
+                    } else {
+                        infoEl.appendChild(statusContainer);
+                    }
+                }
+                statusContainer.innerHTML = ''; // Clear for redraw
+
+                // prism_new_2: 天命所归 (Wildcard)
+                if (playerHasHextechId(p, 'prism_new_2') && p.wildcardTile) {
+                    const wcDiv = document.createElement('div');
+                    wcDiv.style.display = 'flex';
+                    wcDiv.style.alignItems = 'center';
+                    wcDiv.title = '天命所归：本局专属万能牌';
+                    
+                    const label = document.createElement('span');
+                    label.textContent = '万能:';
+                    label.style.marginRight = '2px';
+                    label.style.color = '#00ffff'; // Cyan for Prismatic
+                    wcDiv.appendChild(label);
+                    
+                    // Wrapper for scaled tile
+                    const tileWrapper = document.createElement('div');
+                    tileWrapper.style.width = '24px';
+                    tileWrapper.style.height = '34px';
+                    tileWrapper.style.position = 'relative';
+                    
+                    const tileEl = createTileEl(p.wildcardTile, false);
+                    tileEl.style.transform = 'scale(0.5)';
+                    tileEl.style.transformOrigin = 'top left';
+                    tileEl.style.position = 'absolute';
+                    tileEl.style.top = '0';
+                    tileEl.style.left = '0';
+                    
+                    tileWrapper.appendChild(tileEl);
+                    wcDiv.appendChild(tileWrapper);
+                    statusContainer.appendChild(wcDiv);
+                }
+
+                // prism_new_10: 轮回 (Reincarnation Score)
+                if (playerHasHextechId(p, 'prism_new_10') && p.reincarnationScore > 0) {
+                    const rDiv = document.createElement('div');
+                    rDiv.style.color = '#ff9ff3';
+                    rDiv.style.fontWeight = 'bold';
+                    rDiv.textContent = `返:${p.reincarnationScore}`;
+                    rDiv.title = '轮回：若下局胡牌，返还此分数';
+                    statusContainer.appendChild(rDiv);
+                }
+                
+                // prism_new_5: 孤注一掷 (Locked)
+                if (playerHasHextechId(p, 'prism_new_5') && p.isTing) {
+                     const lDiv = document.createElement('div');
+                     lDiv.textContent = '🔒绝食';
+                     lDiv.style.color = '#ff4757';
+                     lDiv.title = '孤注一掷：无法摸牌';
+                     statusContainer.appendChild(lDiv);
+                }
+
+                // Gold New 5: 资源回收 Button (Only for Human)
+                if (p.id === 0 && playerHasHextechId(p, 'gold_new_5')) {
+                    const btn = document.createElement('button');
+                    btn.textContent = state.resourceRecycleMode ? '取消回收' : '资源回收';
+                    btn.style.fontSize = '12px';
+                    btn.style.padding = '2px 5px';
+                    btn.style.background = state.resourceRecycleMode ? '#ff4d4d' : '#ffd700'; // Gold color
+                    btn.style.color = state.resourceRecycleMode ? 'white' : 'black';
+                    btn.style.border = '1px solid #e6b800';
+                    btn.style.borderRadius = '4px';
+                    btn.style.cursor = 'pointer';
+                    
+                    // Logic: Can only use if it's my turn (server index), haven't used it, and not in other modes
+                    const canUse = state.currentPlayerIndex === state.myServerId && !p.goldNew5Used && !state.gameOver;
+                    if (!canUse && !state.resourceRecycleMode) {
+                         btn.disabled = true;
+                         btn.style.opacity = '0.5';
+                         btn.style.cursor = 'not-allowed';
+                    }
+                    
+                    btn.onclick = (e) => {
+                        e.stopPropagation();
+                        toggleResourceRecycleMode();
+                    };
+                    
+                    statusContainer.appendChild(btn);
+                }
+            }
+        });
+
+        // 更新中间信息 (局数)：联机用 state.roundNum，单机用 currentRound/maxRounds
+        const roundInfoEl = document.getElementById('round-info');
+        if (roundInfoEl) {
+            if (currentRoomName && state.roundNum != null) {
+                roundInfoEl.textContent = '第 ' + state.roundNum + ' / 16 局';
+            } else {
+                roundInfoEl.textContent = '第 ' + state.currentRound + ' / ' + state.maxRounds + ' 局';
+            }
+        }
+        
+        // 更新剩余牌数
+        const deckInfoEl = document.getElementById('deck-info');
+        if (deckInfoEl) {
+            deckInfoEl.textContent = `剩余: ${state.deck.length}`;
+            // 当牌数少于10张时变红提示
+            if (state.deck.length <= 10) {
+                deckInfoEl.style.color = '#ff4d4d';
+                deckInfoEl.style.borderColor = '#ff4d4d';
+            } else {
+                deckInfoEl.style.color = '#fff';
+                deckInfoEl.style.borderColor = 'rgba(255,255,255,0.2)';
+            }
+        }
+        
+        const dealerLocalIdx2 = typeof state.dealerId === 'number'
+            ? getServerToLocalIndex(state.dealerId)
+            : -1;
+        state.players.forEach(p => {
+            const badge = document.getElementById(`dealer-badge-${p.id}`);
+            if (badge) {
+                badge.style.display = (p.id === dealerLocalIdx2) ? 'inline-block' : 'none';
+            }
+        });
+        
+        let activeId = '';
+        const localCurrentIdx2 = getServerToLocalIndex(state.currentPlayerIndex);
+        if (localCurrentIdx2 === 0) activeId = 'bottom-player';
+        if (localCurrentIdx2 === 1) activeId = 'right-player';
+        if (localCurrentIdx2 === 2) activeId = 'top-player';
+        if (localCurrentIdx2 === 3) activeId = 'left-player';
+        
+        const activeEl = document.getElementById(activeId);
+        if (activeEl) {
+            activeEl.style.opacity = '1';
+            // activeEl.style.transform = 'scale(1.05)'; // Subtle highlight
+            // Or add a glowing border indicator somewhere else, but opacity works for now
+        }
+
+        // Ensure hextech icons are visible
+        renderPlayerHextechs();
+    }
+
+    // --- 界面渲染 ---
+
+    function showInteractionButtonsLegacy(canPeng, canGang, canHu) {
+        const actions = [];
+        if (canHu) actions.push({ type: 'hu' });
+        if (canPeng) actions.push({ type: 'peng' });
+        if (canGang) actions.push({ type: 'gang' });
+        showInteractionButtons(actions);
+    }
+
+    function showInteractionButtons(actions, tile) {
+        const btnHu = document.getElementById('btn-hu');
+        const btnPeng = document.getElementById('btn-peng');
+        const btnGang = document.getElementById('btn-gang');
+        const btnPass = document.getElementById('btn-pass');
+        
+        // Hide all first
+        btnHu.style.display = 'none';
+        btnPeng.style.display = 'none';
+        btnGang.style.display = 'none';
+        btnPass.style.display = 'none';
+
+        if (!actions) return;
+
+        actions.forEach(action => {
+            if (action.type === 'hu') btnHu.style.display = 'block';
+            if (action.type === 'peng') btnPeng.style.display = 'block';
+            if (action.type === 'gang') btnGang.style.display = 'block';
+        });
+
+        if (actions.length > 0) {
+            btnPass.style.display = 'block';
+        }
+    }
+
+    function hideInteractionButtons() {
+        document.getElementById('btn-hu').style.display = 'none';
+        document.getElementById('btn-peng').style.display = 'none';
+        document.getElementById('btn-gang').style.display = 'none';
+        document.getElementById('btn-pass').style.display = 'none';
+        var timerEl = document.getElementById('action-timer');
+        if (timerEl) timerEl.style.display = 'none';
+        if (state.actionTimerId) {
+            clearInterval(state.actionTimerId);
+            state.actionTimerId = null;
+        }
+    }
+
+    function updateStatus() {
+        // 可以在这里更新一些提示信息
+    }
+
+    function endGame(msg) {
+        state.gameOver = true;
+        
+        let buttonHtml = '';
+        if (state.currentRound < state.maxRounds) {
+            buttonHtml = `<button onclick="startNextRound()" style="padding:10px 30px; font-size:20px; border-radius:30px; background:#4CAF50; color:white; border:none; cursor:pointer; box-shadow:0 5px 15px rgba(0,0,0,0.3);">下一局</button>`;
+        } else {
+            // 最后一局，显示大结算
+            msg += showFinalScoreboard();
+            buttonHtml = `<button onclick="location.reload()" style="padding:10px 30px; font-size:20px; border-radius:30px; background:#f44336; color:white; border:none; cursor:pointer; box-shadow:0 5px 15px rgba(0,0,0,0.3);">重新开始</button>`;
+        }
+
+        const msgEl = document.getElementById('message-area');
+        msgEl.innerHTML = `
+            <h2 style="margin:0 0 20px 0; font-size:32px; color:#ffd700;">${state.currentRound < state.maxRounds ? '本局结束' : '全场战绩'}</h2>
+            <div style="font-size:20px; margin-bottom:30px; max-height:60vh; overflow-y:auto;">${msg}</div>
+            ${buttonHtml}
+        `;
+        msgEl.style.display = 'block';
+    }
+
+    function showFinalScoreboard() {
+        let html = "<hr><h3>最终总成绩</h3><ul style='list-style:none; padding:0;'>";
+        // Sort by score
+        const sortedPlayers = [...state.players].sort((a, b) => b.score - a.score);
+        
+        sortedPlayers.forEach((p, index) => {
+            const color = index === 0 ? '#ffd700' : (p.score >= 0 ? '#ff4d4d' : '#4facfe');
+            html += `<li style="font-size:24px; margin:10px 0;">
+                ${index === 0 ? '👑 ' : ''}${p.name}: <span style="color:${color}; font-weight:bold;">${p.score}</span>
+            </li>`;
+        });
+        html += "</ul>";
+        return html;
+    }
+
+    function startNextRound() {
+        document.getElementById('message-area').style.display = 'none';
+        hideInteractionButtons();
+        
+        // 1. 更新局数
+        state.currentRound++;
+        
+        // 2. 轮换庄家
+        const oldDealerId = state.dealerId;
+        if (typeof state.nextDealerId !== 'undefined') {
+            // Prism 2: 天选庄家 - 强制连庄一次
+            if (state.nextDealerId !== oldDealerId) {
+                const oldDealer = state.players[oldDealerId];
+                // Prism 2: 天选庄家 (当庄局数翻倍)
+                // Removed
+            }
+
+            if (state.nextDealerId === state.dealerId) {
+                 state.dealerStreak = (state.dealerStreak || 0) + 1;
+            } else {
+                 state.dealerStreak = 0;
+            }
+
+            state.dealerId = state.nextDealerId;
+            state.nextDealerId = undefined;
+        } else {
+            // 默认轮换
+            state.dealerStreak = 0;
+            state.dealerId = (state.dealerId + 1) % 4;
+        }
+        
+        // 3. 重置局内状态
+        state.gameOver = false;
+        state.actionProcessing = false; // Reset action lock
+        state.pendingDiscards = []; // Clear pending discards
+        state.deck = [];
+        state.roundGangScores = [];
+        state.selectedTileIndex = -1;
+        state.lastDiscard = null;
+        state.isTingMode = false;
+        state.tingCandidates = {};
+        state.isGangKai = false;
+        state.turnCount = 0;
+        state.isGangKaiDiscard = false;
+        
+        // 4. 重置玩家手牌等 (保留分数)
+        state.players.forEach(p => {
+            p.hand = [];
+            p.discards = [];
+            p.peng = [];
+            p.gang = [];
+            p.isTing = false;
+            p.silver3Used = false; // Reset Silver 3 usage
+            p.goldNew5Used = false; // Reset Gold New 5 usage (Resource Recycle)
+            p.prism9Terminated = false; // Reset Prism 9 contract
+            p.anJianUsedTiles = []; // Reset Prism 3 used tiles
+            p.systemPaysForMe = false; // Reset Gold 7 flag
+            p.immuneToPayment = false;
+            p.hextechUsage = {}; // Reset usage counts (like Silver 2)
+            // p.prism7Usage = 0; // Removed Prism 7
+            // p.prism2Used = false; // Removed Prism 2
+        });
+        
+        // 5. 重新开始流程
+        createDeck();
+        shuffleDeck();
+        dealInitialHands();
+        
+        // 庄家先摸
+        state.currentPlayerIndex = state.dealerId;
+        
+        // Check Round 8 Hextech
+        if (state.currentRound === 8) {
+             render();
+             renderPlayerHextechs();
+             startHextechSelection();
+        } else {
+             startGameFlow();
+        }
+    }
+
+    // --- UI 渲染辅助函数 ---
+
+    function getTileVisual(tile) {
+        if (!tile) return '';
+        const suit = tile.slice(-1);
+        const numStr = tile.slice(0, -1);
+        const numMap = {'一':1, '二':2, '三':3, '四':4, '五':5, '六':6, '七':7, '八':8, '九':9};
+        const num = numMap[numStr];
+        
+        let content = '';
+        
+        if (suit === '筒') {
+            content = renderDots(num);
+        } else if (suit === '条') {
+            content = renderBamboo(num);
+        } else if (suit === '万') {
+            content = renderWan(numStr);
+        } else {
+            // 风牌和箭牌
+            content = renderHonors(tile);
+        }
+        
+        return `<div class="tile-content">${content}</div>`;
+    }
+
+    function renderDots(num) {
+        let dotsHtml = '';
+        const positions = {
+            1: [['50%', '50%', '36px', 'red']],
+            2: [['50%', '25%', '14px', 'green'], ['50%', '75%', '14px', 'blue']],
+            3: [['25%', '25%', '14px', 'blue'], ['50%', '50%', '14px', 'red'], ['75%', '75%', '14px', 'green']],
+            4: [['25%', '25%', '14px', 'blue'], ['75%', '25%', '14px', 'green'], ['25%', '75%', '14px', 'green'], ['75%', '75%', '14px', 'blue']],
+            5: [['25%', '25%', '12px', 'blue'], ['75%', '25%', '12px', 'green'], ['50%', '50%', '12px', 'red'], ['25%', '75%', '12px', 'green'], ['75%', '75%', '12px', 'blue']],
+            6: [['25%', '25%', '12px', 'green'], ['75%', '25%', '12px', 'green'], ['25%', '50%', '12px', 'red'], ['75%', '50%', '12px', 'red'], ['25%', '75%', '12px', 'red'], ['75%', '75%', '12px', 'red']],
+            7: [['25%', '20%', '10px', 'green'], ['50%', '25%', '10px', 'green'], ['75%', '30%', '10px', 'green'], ['25%', '60%', '10px', 'red'], ['75%', '60%', '10px', 'red'], ['25%', '80%', '10px', 'red'], ['75%', '80%', '10px', 'red']],
+            8: [['25%', '20%', '10px', 'blue'], ['75%', '20%', '10px', 'blue'], ['25%', '40%', '10px', 'blue'], ['75%', '40%', '10px', 'blue'], ['25%', '60%', '10px', 'blue'], ['75%', '60%', '10px', 'blue'], ['25%', '80%', '10px', 'blue'], ['75%', '80%', '10px', 'blue']],
+            9: [['25%', '20%', '10px', 'green'], ['50%', '20%', '10px', 'green'], ['75%', '20%', '10px', 'green'], ['25%', '50%', '10px', 'red'], ['50%', '50%', '10px', 'red'], ['75%', '50%', '10px', 'red'], ['25%', '80%', '10px', 'blue'], ['50%', '80%', '10px', 'blue'], ['75%', '80%', '10px', 'blue']]
+        };
+
+        if (positions[num]) {
+            positions[num].forEach(([left, top, size, color]) => {
+                dotsHtml += `<div class="dot color-${color}" style="position:absolute; left:${left}; top:${top}; width:${size}; height:${size}; transform: translate(-50%, -50%);"></div>`;
+            });
+        }
+        return `<div style="position:relative; width:100%; height:100%;">${dotsHtml}</div>`;
+    }
+
+    function renderBamboo(num) {
+        if (num === 1) {
+            // Bird (Yaoji) shape - Peacock style
+            return `<svg viewBox="0 0 100 100" width="100%" height="100%">
+                <!-- Tail (Peacock fan) -->
+                <path d="M20 50 Q50 10 80 50" fill="none" stroke="#008000" stroke-width="2" />
+                <path d="M50 50 L50 20" stroke="#008000" stroke-width="2" />
+                <path d="M50 50 L30 25" stroke="#008000" stroke-width="2" />
+                <path d="M50 50 L70 25" stroke="#008000" stroke-width="2" />
+                <circle cx="50" cy="20" r="3" fill="#d00" />
+                <circle cx="30" cy="25" r="3" fill="#d00" />
+                <circle cx="70" cy="25" r="3" fill="#d00" />
+                
+                <!-- Body -->
+                <path d="M40 50 Q50 40 60 50 Q70 70 50 80 Q30 70 40 50" fill="#008000" />
+                
+                <!-- Wing -->
+                <path d="M45 55 Q55 55 55 65" fill="none" stroke="#FFD700" stroke-width="2" />
+
+                <!-- Head -->
+                <circle cx="50" cy="45" r="8" fill="#d00" />
+                <circle cx="47" cy="43" r="1.5" fill="white" />
+                
+                <!-- Beak -->
+                <path d="M42 45 L35 48" stroke="#FFD700" stroke-width="2" />
+                
+                <!-- Legs -->
+                <path d="M45 80 L45 90" stroke="#FFD700" stroke-width="2" />
+                <path d="M55 80 L55 90" stroke="#FFD700" stroke-width="2" />
+            </svg>`;
+        }
+        
+        let sticksHtml = '';
+        // Simplified stick layouts
+        const layouts = {
+            2: [['50%','30%'], ['50%','70%']],
+            3: [['50%','20%'], ['30%','70%'], ['70%','70%']], // One top, two bottom
+            4: [['30%','30%'], ['70%','30%'], ['30%','70%'], ['70%','70%']],
+            5: [['30%','25%'], ['70%','25%'], ['50%','50%'], ['30%','75%'], ['70%','75%']],
+            6: [['30%','25%'], ['50%','25%'], ['70%','25%'], ['30%','75%'], ['50%','75%'], ['70%','75%']], // 3 top 3 bottom
+            7: [['50%','20%','red'], ['30%','50%','green'], ['50%','50%','green'], ['70%','50%','green'], ['30%','80%','green'], ['50%','80%','green'], ['70%','80%','green']],
+            8: [['30%','20%'], ['70%','20%'], ['30%','40%'], ['70%','40%'], ['30%','60%'], ['70%','60%'], ['30%','80%'], ['70%','80%']], // W shape ish
+            9: [['30%','25%','red'], ['50%','25%','red'], ['70%','25%','red'], ['30%','50%','blue'], ['50%','50%','blue'], ['70%','50%','blue'], ['30%','75%','green'], ['50%','75%','green'], ['70%','75%','green']]
+        };
+
+        const config = layouts[num];
+        if (config) {
+            config.forEach(item => {
+                const [left, top, colorOverride] = item;
+                const color = colorOverride || 'green';
+                sticksHtml += `<div class="bamboo-stick color-${color}" style="position:absolute; left:${left}; top:${top}; height:20%; transform: translate(-50%, -50%);"></div>`;
+            });
+        }
+        return `<div style="position:relative; width:100%; height:100%;">${sticksHtml}</div>`;
+    }
+
+    function renderWan(numStr) {
+        return `<div style="display:flex; flex-direction:column; justify-content:space-between; height:100%; padding:2px 0;">
+            <div class="char-wan color-red" style="font-size:32px;">${numStr}</div>
+            <div class="char-wan color-red" style="font-size:26px;">万</div>
+        </div>`;
+    }
+
+    function renderHonors(tile) {
+        let displayChar = tile;
+        let color = 'black';
+        
+        if (tile === '中') {
+            color = 'red';
+        } else if (tile === '发财') {
+            color = 'green';
+            displayChar = '发';
+        } else if (tile === '白板') {
+            color = 'blue';
+        } else if (tile.endsWith('风')) {
+             displayChar = tile[0]; // 只显示'东'/'南'等
+             color = 'black';
+        }
+        
+        // Special render for white dragon (frame)
+        if (tile === '白板') {
+            return `<div style="width:80%; height:80%; border:3px solid #00d; border-radius:4px;"></div>`;
+        }
+        
+        return `<div class="char-honor color-${color}">${displayChar}</div>`;
+    }
+
+    // --- 初始化 ---
+    // 绑定按钮事件
+    document.getElementById('btn-discard').onclick = onDiscardBtnClick;
+    document.getElementById('btn-hu').onclick = onHuClick;
+    document.getElementById('btn-peng').onclick = onPengClick;
+    document.getElementById('btn-gang').onclick = onGangClick;
+    document.getElementById('btn-pass').onclick = onPassClick;
+    document.getElementById('btn-cancel-takeover').onclick = function () {
+        if (!currentRoomName || !state.isTakeover) return;
+        socket.emit('action', { roomName: currentRoomName, type: 'cancelTakeover', data: {} });
+    };
+
+    // 预加载语音列表 (尝试解决某些浏览器第一次获取不到的问题)
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.getVoices();
+    }
+
+    const startBtn = document.getElementById('btn-start-game');
+    const createBtn = document.getElementById('btn-create-room');
+
+    function joinRoom(isCreate) {
+        if (hasJoinedRoom) {
+            var statusEl = document.getElementById('login-status');
+            if (statusEl) {
+                statusEl.textContent = '你已经在房间中，如需重新加入请刷新页面。';
+            }
+            return;
+        }
+
+        if (startBtn && startBtn.getAttribute('data-clicked') !== 'true') {
+            startBtn.setAttribute('data-clicked', 'true');
+            unlockAudio(); // 本标签页点击「加入/创建」时解锁语音与音效
+        }
+
+        var nameInput = document.getElementById('input-player-name');
+        var roomInput = document.getElementById('input-room-name');
+        
+        // Save name to localStorage
+        if (nameInput && nameInput.value.trim()) {
+            localStorage.setItem('mahjong_player_name', nameInput.value.trim());
+        }
+        
+        localPlayerName = nameInput && nameInput.value.trim() ? nameInput.value.trim() : '玩家';
+
+        if (isCreate) {
+            var autoRoom = '' + Math.floor(Math.random() * 9000 + 1000);
+            currentRoomName = autoRoom;
+            if (roomInput) {
+                roomInput.value = autoRoom;
+            }
+        } else {
+            currentRoomName = roomInput && roomInput.value.trim() ? roomInput.value.trim() : '1001';
+        }
+
+        var statusEl = document.getElementById('login-status');
+        if (statusEl) {
+            if (isCreate) {
+                statusEl.textContent = '已创建房间 ' + currentRoomName + '，等待其他玩家加入...';
+            } else {
+                statusEl.textContent = '正在加入房间 ' + currentRoomName + '...';
+            }
+        }
+
+        // 重连仅用 sessionStorage 的 playerId，避免多标签时 localStorage 被最后加入者覆盖导致 1/2/3 位无法重连
+        var savedPlayerId = sessionStorage.getItem('majiang_player_id') || null;
+        socket.emit('join', {
+            roomName: currentRoomName,
+            playerName: localPlayerName,
+            playerId: savedPlayerId
+        });
+    }
+
+    if (startBtn) {
+        startBtn.onclick = function() {
+            joinRoom(false);
+        };
+    }
+
+    if (createBtn) {
+        createBtn.onclick = function() {
+            joinRoom(true);
+        };
+    }
+
+    // --- Init: Load saved name ---
+    (function() {
+        var savedName = localStorage.getItem('mahjong_player_name');
+        var nameInput = document.getElementById('input-player-name');
+        if (savedName && nameInput) {
+            nameInput.value = savedName;
+        }
+    })();
+
+</script>
+
+</body>
+</html>
