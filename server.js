@@ -5,10 +5,12 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-// 强化心跳：防止 Render 等平台误判连接断开
+// 生产环境心跳：防止 Sealos/网关因长时间无数据而断开 WebSocket（可通过 PING_INTERVAL/PING_TIMEOUT 覆盖）
+const PING_INTERVAL = parseInt(process.env.PING_INTERVAL, 10) || 10000;
+const PING_TIMEOUT = parseInt(process.env.PING_TIMEOUT, 10) || 30000;
 const io = new Server(server, {
-    pingTimeout: 30000,
-    pingInterval: 10000
+    pingTimeout: PING_TIMEOUT,
+    pingInterval: PING_INTERVAL
 });
 
 // 1. 基础框架：使用 Express 托管当前目录下的静态文件
@@ -2094,7 +2096,7 @@ function startGame(roomName) {
 }
 
 // 端口设置
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT, 10) || 3000;
 server.listen(PORT, '0.0.0.0', () => {
-    console.log('服务器已在端口 ' + PORT + ' 启动');
+    console.log('服务器已在 0.0.0.0:' + PORT + ' 启动');
 });
