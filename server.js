@@ -900,6 +900,7 @@ function startNextRound(roomName, winnerId, winType) {
 
     room.state.codeInterferenceActive = false;
     room.state.codeInterferenceTurnsLeft = null;
+    room.state.codeInterferenceConfusedUntilDiscard = null;
 
     const dealer = room.players[room.state.dealerId];
     // 大魔法师：庄家第一回合先摸一张牌，再触发交换（交换后不再摸牌）
@@ -1285,9 +1286,15 @@ io.on('connection', (socket) => {
                 }
                 room.state.lastDiscard = null;
                 room.pendingActions = {};
+                // 代码干扰：碰牌后，除拥有者外每人“手牌混淆”直到该玩家自己出完牌才恢复
                 if (room.players.some(p => p.hextechs && p.hextechs.includes('prism_new_16'))) {
                     room.state.codeInterferenceActive = true;
-                    room.state.codeInterferenceTurnsLeft = 2; // 持续到“下一家”出牌后再清除，便于看到效果
+                    room.state.codeInterferenceConfusedUntilDiscard = {};
+                    room.players.forEach(p => {
+                        if (!p.hextechs || !p.hextechs.includes('prism_new_16')) {
+                            room.state.codeInterferenceConfusedUntilDiscard[p.id] = true;
+                        }
+                    });
                 }
                 broadcastGameState(roomName);
             }
@@ -1663,16 +1670,7 @@ io.on('connection', (socket) => {
         const room = rooms[roomName];
         if (!room) return;
         
-        // 代码干扰：碰牌后持续到“下一家”出牌后再清除（codeInterferenceTurnsLeft 2→1→0）
-        if (room.state.codeInterferenceTurnsLeft != null) {
-            room.state.codeInterferenceTurnsLeft--;
-            if (room.state.codeInterferenceTurnsLeft <= 0) {
-                room.state.codeInterferenceActive = false;
-                room.state.codeInterferenceTurnsLeft = null;
-            }
-        } else {
-            room.state.codeInterferenceActive = false;
-        }
+        // 代码干扰：每人“手牌混淆”在 handleDiscard 中该玩家出牌时单独清除，此处不再全局清除
         room.state.turnDiscarded = false;
 
         if (room.timer) clearTimeout(room.timer);
@@ -1961,6 +1959,13 @@ io.on('connection', (socket) => {
             tileIndex: realIndex,
             isTing: !!isTing // 仅在报听的那次出牌为 true
         });
+
+        // 代码干扰：该玩家出完牌后，仅解除该玩家自己的手牌混淆
+        if (room.state.codeInterferenceConfusedUntilDiscard && room.state.codeInterferenceConfusedUntilDiscard[player.id]) {
+            room.state.codeInterferenceConfusedUntilDiscard[player.id] = false;
+            const stillConfused = Object.values(room.state.codeInterferenceConfusedUntilDiscard).some(v => v);
+            if (!stillConfused) room.state.codeInterferenceActive = false;
+        }
         
         const availableActions = checkActionsAfterDiscard(room, discardedTile, player.id);
         room.pendingActions = availableActions;
@@ -2014,7 +2019,7 @@ io.on('connection', (socket) => {
             roundNum: room.state.roundNum,
             currentPlayerDrewThisTurn: !!room.state.currentPlayerDrewThisTurn,
             codeInterferenceActive: !!room.state.codeInterferenceActive,
-            confuseMyHand: !!room.state.codeInterferenceActive && !(recipient.hextechs && recipient.hextechs.includes('prism_new_16')),
+            confuseMyHand: !!(room.state.codeInterferenceConfusedUntilDiscard && room.state.codeInterferenceConfusedUntilDiscard[recipient.id]),
             waitingForArchmage: room.waitingForArchmage != null ? room.waitingForArchmage : undefined,
             pendingActions: room.pendingActions,
             players: room.players.map(p => {
