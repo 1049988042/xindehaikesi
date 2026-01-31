@@ -4262,7 +4262,7 @@
             }
         }
 
-        // 重连仅用 sessionStorage 的 playerId，避免多标签时 localStorage 被最后加入者覆盖导致 1/2/3 位无法重连
+        // 重连：服务端优先用 playerId 匹配离线位，若无则用相同用户名匹配（同一房间+同一用户名即可重连）
         var savedPlayerId = sessionStorage.getItem('majiang_player_id') || null;
         socket.emit('join', {
             roomName: currentRoomName,

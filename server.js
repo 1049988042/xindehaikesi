@@ -986,14 +986,20 @@ io.on('connection', (socket) => {
         // 统一用字符串比较 playerId，避免类型不一致导致匹配失败
         const clientPid = clientPlayerId != null ? String(clientPlayerId) : '';
 
-        // 断线重连：仅用 playerId 匹配该房间内的离线位，退出去再进同一房间可正常接管
-        const tryReconnect = (pid) => {
+        // 断线重连：优先用 playerId 匹配离线位，若无则用用户名相同匹配（只需同一房间+同一用户名即可重连）
+        const tryReconnectById = (pid) => {
             if (!pid) return null;
             return room.players.find(
                 p => p.playerId != null && String(p.playerId) === pid && p.isOffline === true
             );
         };
-        const existing = tryReconnect(clientPid);
+        const tryReconnectByName = (name) => {
+            if (!name) return null;
+            return room.players.find(
+                p => p.name === name && p.isOffline === true
+            );
+        };
+        const existing = tryReconnectById(clientPid) || tryReconnectByName(playerNameTrim);
         if (existing) {
             if (!existing.isOffline) {
                 socket.emit('error', '该账号已在别处登录');
@@ -1013,9 +1019,9 @@ io.on('connection', (socket) => {
             return;
         }
 
-        // 新玩家：房间已满时再尝试一次按 playerId 接管离线位（避免多人断线时仅第一个能重连）
+        // 新玩家：房间已满时再尝试一次按 playerId 或用户名接管离线位（避免多人断线时仅第一个能重连）
         if (room.players.length >= 4) {
-            const existing2 = tryReconnect(clientPid);
+            const existing2 = tryReconnectById(clientPid) || tryReconnectByName(playerNameTrim);
             if (existing2) {
                 existing2.socketId = socket.id;
                 existing2.isOffline = false;
@@ -1030,7 +1036,10 @@ io.on('connection', (socket) => {
                 });
                 return;
             }
-            socket.emit('error', '房间已满。若为断线重连，请使用断线前的同一标签页重新打开并点击加入。');
+            const offlineCount = room.players.filter(p => p.isOffline).length;
+            socket.emit('error', offlineCount > 0
+                ? '房间已满（当前有 ' + offlineCount + ' 人离线）。若您是断线玩家，请用相同用户名重新加入即可重连。'
+                : '房间已满。若为断线重连，请使用相同用户名重新加入该房间。');
             return;
         }
         // 新玩家：该房间内已有相同用户名则拒绝
