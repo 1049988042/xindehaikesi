@@ -1,16 +1,20 @@
-# 海克斯麻将 - Sealos 容器化
+# 1. 使用 Node.js 18 版本的镜像
 FROM node:18-alpine
 
+# 2. 安装基础工具
+RUN apk add --no-cache git
+
+# 3. 设置工作目录
 WORKDIR /app
 
-# 依赖先装，利用缓存
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+# 4. 把你 GitHub 的代码全部下载进来
+RUN git clone https://github.com/1049988042/xindehaikesi.git .
 
-COPY . .
+# 5. 安装 JS 依赖包
+RUN npm install
 
-# 使用环境变量 PORT（Sealos 会注入）
-ENV PORT=3000
+# 6. 暴露游戏端口 (3000)
 EXPOSE 3000
 
+# 7. 最终启动指令（JS 格式）
 CMD ["node", "server.js"]
