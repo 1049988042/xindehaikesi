@@ -899,18 +899,36 @@ function startNextRound(roomName, winnerId, winType) {
     });
 
     room.state.codeInterferenceActive = false;
+    room.state.codeInterferenceTurnsLeft = null;
+
+    const dealer = room.players[room.state.dealerId];
+    // 大魔法师：庄家第一回合在摸牌前先触发（第一个回合就触发）
+    if (dealer.hextechs && dealer.hextechs.includes('prism_new_15') && !dealer.archmageUsedThisRound && !dealer.isBot) {
+        room.waitingForArchmage = dealer.id;
+        io.to(dealer.socketId).emit('archmageSwapRequest', { timeout: 15000 });
+        room.archmageTimer = setTimeout(() => {
+            const r = rooms[roomName];
+            if (r && r.waitingForArchmage != null) {
+                const pl = r.players.find(p => p.id === r.waitingForArchmage);
+                if (pl) pl.archmageUsedThisRound = true;
+                r.waitingForArchmage = null;
+                if (r.archmageTimer) clearTimeout(r.archmageTimer);
+                r.archmageTimer = null;
+                doDrawAndStartTurn(roomName);
+            }
+        }, 15000);
+        if (_broadcastGameState) _broadcastGameState(roomName);
+        return;
+    }
 
     // 庄家摸第一张牌（天命眷顾：前三巡摸牌必为手中已有）
-    const dealer = room.players[room.state.dealerId];
     const dealerDraw = drawTileFromDeck(room, dealer);
     if (dealerDraw) dealer.hand.push(dealerDraw);
     room.state.currentPlayerDrewThisTurn = true;
 
-    // 重新广播状态（使用模块级引用，否则 startNextRound 在此作用域外无法调用）
     if (_broadcastGameState) _broadcastGameState(roomName);
     else console.error('[startNextRound] broadcastGameState not ready');
 
-    // 启动庄家回合（使用模块级引用）
     if (dealer.isTing && _handleDiscard) {
         setTimeout(() => {
             const currentRoom = rooms[roomName];
@@ -1116,9 +1134,25 @@ io.on('connection', (socket) => {
                 
                 const dealer = room.players[room.state.dealerId];
                 if (dealer && room.state.deck.length > 0) {
-                    const dealerDraw = drawTileFromDeck(room, dealer);
-                    if (dealerDraw) dealer.hand.push(dealerDraw);
-                    room.state.currentPlayerDrewThisTurn = true;
+                    if (dealer.hextechs && dealer.hextechs.includes('prism_new_15') && !dealer.archmageUsedThisRound && !dealer.isBot) {
+                        room.waitingForArchmage = dealer.id;
+                        io.to(dealer.socketId).emit('archmageSwapRequest', { timeout: 15000 });
+                        room.archmageTimer = setTimeout(() => {
+                            const r = rooms[roomName];
+                            if (r && r.waitingForArchmage != null) {
+                                const pl = r.players.find(p => p.id === r.waitingForArchmage);
+                                if (pl) pl.archmageUsedThisRound = true;
+                                r.waitingForArchmage = null;
+                                if (r.archmageTimer) clearTimeout(r.archmageTimer);
+                                r.archmageTimer = null;
+                                doDrawAndStartTurn(roomName);
+                            }
+                        }, 15000);
+                    } else {
+                        const dealerDraw = drawTileFromDeck(room, dealer);
+                        if (dealerDraw) dealer.hand.push(dealerDraw);
+                        room.state.currentPlayerDrewThisTurn = true;
+                    }
                 }
 
                 // Handle Prism New 2 (Wildcard)
@@ -1139,19 +1173,21 @@ io.on('connection', (socket) => {
 
                 broadcastGameState(roomName);
                 
-                // 启动庄家回合处理
-                if (dealer.isTing) {
-                    console.log(`[${roomName}] Dealer is Ting, auto discarding in 1s.`);
-                    setTimeout(() => {
-                        const currentRoom = rooms[roomName];
-                        if (currentRoom && currentRoom.state.currentPlayerIndex === dealer.id && !currentRoom.state.turnDiscarded) {
-                            const tileIndex = dealer.hand.length - 1;
-                            const tile = dealer.hand[tileIndex];
-                            handleDiscard(roomName, null, tile, tileIndex, false);
-                        }
-                    }, 1000);
-                } else {
-                    startTurnTimer(roomName, room.state.dealerId);
+                // 启动庄家回合处理（大魔法师等待交换时不要启动出牌计时器，否则会误触发托管/出牌）
+                if (!room.waitingForArchmage) {
+                    if (dealer.isTing) {
+                        console.log(`[${roomName}] Dealer is Ting, auto discarding in 1s.`);
+                        setTimeout(() => {
+                            const currentRoom = rooms[roomName];
+                            if (currentRoom && currentRoom.state.currentPlayerIndex === dealer.id && !currentRoom.state.turnDiscarded) {
+                                const tileIndex = dealer.hand.length - 1;
+                                const tile = dealer.hand[tileIndex];
+                                handleDiscard(roomName, null, tile, tileIndex, false);
+                            }
+                        }, 1000);
+                    } else {
+                        startTurnTimer(roomName, room.state.dealerId);
+                    }
                 }
             }
         } 
@@ -1223,6 +1259,7 @@ io.on('connection', (socket) => {
                 room.pendingActions = {};
                 if (room.players.some(p => p.hextechs && p.hextechs.includes('prism_new_16'))) {
                     room.state.codeInterferenceActive = true;
+                    room.state.codeInterferenceTurnsLeft = 2; // 持续到“下一家”出牌后再清除，便于看到效果
                 }
                 broadcastGameState(roomName);
             }
@@ -1586,7 +1623,16 @@ io.on('connection', (socket) => {
         const room = rooms[roomName];
         if (!room) return;
         
-        room.state.codeInterferenceActive = false; // 代码干扰：每回合开始时清除
+        // 代码干扰：碰牌后持续到“下一家”出牌后再清除（codeInterferenceTurnsLeft 2→1→0）
+        if (room.state.codeInterferenceTurnsLeft != null) {
+            room.state.codeInterferenceTurnsLeft--;
+            if (room.state.codeInterferenceTurnsLeft <= 0) {
+                room.state.codeInterferenceActive = false;
+                room.state.codeInterferenceTurnsLeft = null;
+            }
+        } else {
+            room.state.codeInterferenceActive = false;
+        }
         room.state.turnDiscarded = false;
 
         if (room.timer) clearTimeout(room.timer);

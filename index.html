@@ -1282,13 +1282,14 @@
                 showSilver3UI(human);
             }
 
-            // Sort hand locally for display comfort
-            if (newHand.length % 3 === 2 && state.currentPlayerIndex === state.myServerId) {
-                // Only keep last tile separate if it's MY turn and I have 14 tiles
-                const drawn = newHand.pop();
-                sortHand(newHand);
-                newHand.push(drawn);
-            } else {
+            // 摸牌/杠后摸牌保持在最右：仅当 14 张且轮到我时把最后一张单独排；13 张时整手排序；14 张非我回合不排序，保留服务端顺序
+            if (newHand.length % 3 === 2) {
+                if (state.currentPlayerIndex === state.myServerId) {
+                    const drawn = newHand.pop();
+                    sortHand(newHand);
+                    newHand.push(drawn);
+                }
+            } else if (newHand.length % 3 === 1) {
                 sortHand(newHand);
             }
             state.players[0].hand = newHand;
@@ -3587,16 +3588,27 @@
             var canSeeAllHex = playerHasHextechId(human, 'prism_new_4');
 
             if (player.isAi) {
-                // 其他玩家手牌（右/顶/左）；代码干扰：有该海克斯时对手牌面混淆一回合
+                // 其他玩家手牌（右/顶/左）；代码干扰：有该海克斯时对手牌面混淆一回合（显示假牌面，使无镜像/暗箱时也有可见效果）
                 var codeConfused = state.codeInterferenceActive && playerHasHextechId(human, 'prism_new_16');
                 player.hand.forEach(function(tile, index) {
                     var hasBlackBox = playerHasHextechId(human, 'gold_new_8');
                     var reveal = !codeConfused && (canSeeAllHex || (hasBlackBox && index < 3));
-                    var tileEl = createTileEl(reveal ? tile : null, !reveal);
+                    var showTile = reveal ? tile : null;
+                    if (codeConfused && typeof ALL_POSSIBLE_TILES !== 'undefined' && ALL_POSSIBLE_TILES.length > 0) {
+                        // 混淆时显示假牌面（按 index+turnCount 取模，同一回合内稳定不闪烁）
+                        var turnSeed = (state.turnCount || 0) * 13 + (state.roundNum || 0) * 7;
+                        var fakeIdx = (index + turnSeed + player.id * 5) % ALL_POSSIBLE_TILES.length;
+                        showTile = ALL_POSSIBLE_TILES[fakeIdx];
+                    }
+                    var tileEl = createTileEl(showTile, !showTile);
                     if (reveal) {
                         tileEl.style.opacity = '0.9';
                         if (canSeeAllHex) tileEl.title = "【镜像世界】可见";
                         if (hasBlackBox && index < 3 && !canSeeAllHex) tileEl.title = "【暗箱操作】可见";
+                    }
+                    if (codeConfused && showTile) {
+                        tileEl.style.opacity = '0.75';
+                        tileEl.title = '【代码干扰】显示已混淆，非真实牌面';
                     }
                     if (isHasDrawn && index === player.hand.length - 1) {
                         if (isVerticalHand) tileEl.style.marginTop = '20px';
