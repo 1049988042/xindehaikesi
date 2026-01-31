@@ -72,7 +72,8 @@
         #right-player .hand { flex-direction: column; }
         
         #bottom-player { bottom: 20px; left: 0; right: 0; flex-direction: column; justify-content: flex-end; }
-        #bottom-player .hand { margin-bottom: 20px; flex-direction: row; }
+        /* 自己手牌等比例放大至面积约两倍（边长 ×√2），其他位置不变 */
+        #bottom-player .hand { margin-bottom: 20px; flex-direction: row; --tile-w: calc(48px * 1.414); --tile-h: calc(66px * 1.414); }
 
         /* Center Area (Discards) */
         #center-area {
@@ -504,6 +505,8 @@
                 --tile-h: 12vmin;
                 --tile-depth: 1.5vmin;
             }
+            /* 自己手牌等比例放大至面积约两倍，其他位置不变 */
+            #bottom-player .hand { --tile-w: calc(8.5vmin * 1.414); --tile-h: calc(12vmin * 1.414); }
 
             /* Convert fixed pixel containers to relative units */
             #center-area {
