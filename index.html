@@ -72,7 +72,7 @@
         #right-player .hand { flex-direction: column; }
         
         #bottom-player { bottom: 20px; left: 0; right: 0; flex-direction: column; justify-content: flex-end; }
-        #bottom-player .hand { margin-bottom: 20px; }
+        #bottom-player .hand { margin-bottom: 20px; flex-direction: row; }
 
         /* Center Area (Discards) */
         #center-area {
@@ -1213,6 +1213,7 @@
         }
         state.currentPlayerDrewThisTurn = !!data.currentPlayerDrewThisTurn;
         state.codeInterferenceActive = !!data.codeInterferenceActive;
+        state.confuseMyHand = !!data.confuseMyHand;
         state.waitingForArchmage = data.waitingForArchmage;
         
         if (data.roomName) {
@@ -3588,27 +3589,15 @@
             var canSeeAllHex = playerHasHextechId(human, 'prism_new_4');
 
             if (player.isAi) {
-                // 其他玩家手牌（右/顶/左）；代码干扰：有该海克斯时对手牌面混淆一回合（显示假牌面，使无镜像/暗箱时也有可见效果）
-                var codeConfused = state.codeInterferenceActive && playerHasHextechId(human, 'prism_new_16');
+                // 其他玩家手牌（右/顶/左）；代码干扰效果在对手视角混淆其自己的手牌，我视角仍只看牌背
                 player.hand.forEach(function(tile, index) {
                     var hasBlackBox = playerHasHextechId(human, 'gold_new_8');
-                    var reveal = !codeConfused && (canSeeAllHex || (hasBlackBox && index < 3));
-                    var showTile = reveal ? tile : null;
-                    if (codeConfused && typeof ALL_POSSIBLE_TILES !== 'undefined' && ALL_POSSIBLE_TILES.length > 0) {
-                        // 混淆时显示假牌面（按 index+turnCount 取模，同一回合内稳定不闪烁）
-                        var turnSeed = (state.turnCount || 0) * 13 + (state.roundNum || 0) * 7;
-                        var fakeIdx = (index + turnSeed + player.id * 5) % ALL_POSSIBLE_TILES.length;
-                        showTile = ALL_POSSIBLE_TILES[fakeIdx];
-                    }
-                    var tileEl = createTileEl(showTile, !showTile);
+                    var reveal = canSeeAllHex || (hasBlackBox && index < 3);
+                    var tileEl = createTileEl(reveal ? tile : null, !reveal);
                     if (reveal) {
                         tileEl.style.opacity = '0.9';
                         if (canSeeAllHex) tileEl.title = "【镜像世界】可见";
                         if (hasBlackBox && index < 3 && !canSeeAllHex) tileEl.title = "【暗箱操作】可见";
-                    }
-                    if (codeConfused && showTile) {
-                        tileEl.style.opacity = '0.75';
-                        tileEl.title = '【代码干扰】显示已混淆，非真实牌面';
                     }
                     if (isHasDrawn && index === player.hand.length - 1) {
                         if (isVerticalHand) tileEl.style.marginTop = '20px';
@@ -3637,13 +3626,14 @@
                 }
 
             } else {
-                // 自己手牌（底）：天命所归时万能牌放最左端且牌右上角小“赖”字
+                // 自己手牌（底）：天命所归时万能牌放最左端且牌右上角小“赖”字；代码干扰时对手视角看自己的手牌为混淆（假牌面）
                 var handToRender = player.hand;
                 var displayToHandIndex = null;
                 if (playerHasHextechId(player, 'prism_new_2') && player.wildcardTile) {
                     var wildcards = player.hand.filter(function(t){ return t === player.wildcardTile; });
                     var rest = player.hand.filter(function(t){ return t !== player.wildcardTile; });
                     rest.sort(function(a,b){ return getTileWeight(a) - getTileWeight(b); });
+                    /* 赖子最左、普通牌最右：赖子在前(左)，普通牌在后(右) */
                     handToRender = wildcards.concat(rest);
                     displayToHandIndex = [];
                     var used = {};
@@ -3656,12 +3646,22 @@
                 }
                 handToRender.forEach(function(tile, displayIndex) {
                     var index = displayToHandIndex ? displayToHandIndex[displayIndex] : displayIndex;
-                    var tileEl = createTileEl(tile, false);
+                    var showTile = tile;
+                    if (state.confuseMyHand && typeof ALL_POSSIBLE_TILES !== 'undefined' && ALL_POSSIBLE_TILES.length > 0) {
+                        var turnSeed = (state.turnCount || 0) * 13 + (state.roundNum || 0) * 7;
+                        var fakeIdx = (index + turnSeed + (state.myServerId || 0) * 5) % ALL_POSSIBLE_TILES.length;
+                        showTile = ALL_POSSIBLE_TILES[fakeIdx];
+                    }
+                    var tileEl = createTileEl(showTile, false);
+                    if (state.confuseMyHand) {
+                        tileEl.style.opacity = '0.75';
+                        tileEl.title = '【代码干扰】你的手牌显示已混淆，非真实牌面';
+                    }
                     if (isHasDrawn && index === player.hand.length - 1) {
                         tileEl.style.marginLeft = '20px';
                         tileEl.classList.add('anim-draw');
                     }
-                    if (playerHasHextechId(player, 'prism_new_2') && player.wildcardTile && tile === player.wildcardTile) {
+                    if (!state.confuseMyHand && playerHasHextechId(player, 'prism_new_2') && player.wildcardTile && tile === player.wildcardTile) {
                         var laiBadge = document.createElement('span');
                         laiBadge.textContent = '赖';
                         laiBadge.style.position = 'absolute'; laiBadge.style.top = '2px'; laiBadge.style.right = '2px';
