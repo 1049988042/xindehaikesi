@@ -5,7 +5,7 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-// 生产环境心跳：防止 Sealos/网关因长时间无数据而断开 WebSocket（可通过 PING_INTERVAL/PING_TIMEOUT 覆盖）
+// 生产环境心跳：防止 Railway 等网关因长时间无数据而断开 WebSocket（可通过 PING_INTERVAL/PING_TIMEOUT 覆盖）
 const PING_INTERVAL = parseInt(process.env.PING_INTERVAL, 10) || 10000;
 const PING_TIMEOUT = parseInt(process.env.PING_TIMEOUT, 10) || 30000;
 const io = new Server(server, {
