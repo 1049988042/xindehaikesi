@@ -3626,22 +3626,32 @@
                 }
 
             } else {
-                // 自己手牌（底）：天命所归时万能牌放最左端且牌右上角小“赖”字；代码干扰时对手视角看自己的手牌为混淆（假牌面）
+                // 自己手牌（底）：天命所归时万能牌放最左端、普通牌中间、刚摸的牌固定最右；代码干扰时对手视角看自己的手牌为混淆（假牌面）
                 var handToRender = player.hand;
                 var displayToHandIndex = null;
+                var drawnHandIndex = (player.hand.length % 3 === 2) && (state.currentPlayerIndex === serverIdxOfPlayer) && !!state.currentPlayerDrewThisTurn ? player.hand.length - 1 : -1;
                 if (playerHasHextechId(player, 'prism_new_2') && player.wildcardTile) {
-                    var wildcards = player.hand.filter(function(t){ return t === player.wildcardTile; });
-                    var rest = player.hand.filter(function(t){ return t !== player.wildcardTile; });
+                    var handWithoutDrawn = drawnHandIndex >= 0 ? player.hand.slice(0, drawnHandIndex).concat(player.hand.slice(drawnHandIndex + 1)) : player.hand;
+                    var drawnTile = drawnHandIndex >= 0 ? player.hand[drawnHandIndex] : null;
+                    var wildcards = handWithoutDrawn.filter(function(t){ return t === player.wildcardTile; });
+                    var rest = handWithoutDrawn.filter(function(t){ return t !== player.wildcardTile; });
                     rest.sort(function(a,b){ return getTileWeight(a) - getTileWeight(b); });
-                    /* 赖子最左、普通牌最右：赖子在前(左)，普通牌在后(右) */
+                    /* 赖子最左、普通牌中间、刚摸的牌固定最右 */
                     handToRender = wildcards.concat(rest);
+                    if (drawnTile !== null) handToRender.push(drawnTile);
                     displayToHandIndex = [];
                     var used = {};
-                    handToRender.forEach(function(tile) {
-                        var idx = player.hand.indexOf(tile);
-                        while (used[idx]) idx = player.hand.indexOf(tile, idx + 1);
+                    handToRender.forEach(function(tile, displayPos) {
+                        if (drawnHandIndex >= 0 && displayPos === handToRender.length - 1) {
+                            displayToHandIndex.push(drawnHandIndex);
+                            return;
+                        }
+                        var arr = drawnHandIndex >= 0 ? handWithoutDrawn : player.hand;
+                        var idx = arr.indexOf(tile);
+                        while (used[idx]) idx = arr.indexOf(tile, idx + 1);
                         used[idx] = true;
-                        displayToHandIndex.push(idx);
+                        var handIdx = drawnHandIndex >= 0 ? (idx < drawnHandIndex ? idx : idx + 1) : idx;
+                        displayToHandIndex.push(handIdx);
                     });
                 }
                 handToRender.forEach(function(tile, displayIndex) {
