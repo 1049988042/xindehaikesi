@@ -1756,8 +1756,7 @@ io.on('connection', (socket) => {
              } else {
                  startTurnTimer(roomName, nextPlayer.id);
              }
-        }
-        
+
         broadcastGameState(roomName);
     }
 
