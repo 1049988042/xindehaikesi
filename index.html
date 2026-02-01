@@ -70,6 +70,18 @@
         .info .dealer-badge { font-size: 24px !important; padding: 0 8px !important; margin: 0 10px !important; }
         .info .status-container { font-size: 24px !important; gap: 16px !important; margin-top: 10px !important; }
 
+        /* 自己(底)和对家(顶)：名字/庄/积分 在海克斯圈前面，整栏一横排；左右玩家保持竖排不变 */
+        .info.info-row {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .info.info-row .info-head { display: inline-flex; align-items: center; flex-shrink: 0; }
+        .info.info-row .status-container { margin-top: 0 !important; }
+        .info.info-row .player-hextechs { margin-top: 0; flex-shrink: 0; }
+
         #top-player { top: 20px; left: 0; right: 0; flex-direction: column; }
         #top-player .hand { flex-direction: row; gap: 4px; }
         /* 他人手牌：面积 0.7 倍，尺寸与间隔不重叠、挨着排 */
@@ -377,7 +389,7 @@
             align-items: center;
         }
 
-        /* Hextech Modal Styles */
+        /* Hextech Modal Styles（选择海克斯页面整体 2 倍） */
         #hextech-modal {
             display: none;
             position: fixed;
@@ -394,15 +406,15 @@
         
         .hextech-container {
             display: flex;
-            gap: 20px;
-            margin-top: 20px;
+            gap: 40px;
+            margin-top: 40px;
         }
         
         .hextech-card {
-            width: 220px;
-            height: 300px;
-            border-radius: 15px;
-            padding: 20px;
+            width: 440px;
+            height: 600px;
+            border-radius: 30px;
+            padding: 40px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -411,50 +423,50 @@
             transition: transform 0.2s, box-shadow 0.2s;
             position: relative;
             background: #2a2a2a;
-            border: 2px solid #555;
+            border: 4px solid #555;
             color: #eee;
         }
         
         .hextech-card:hover {
-            transform: translateY(-10px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            transform: translateY(-20px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
         }
         
         .hextech-card.silver { 
             border-color: #e0e0e0; 
-            box-shadow: 0 0 15px rgba(224, 224, 224, 0.4); 
+            box-shadow: 0 0 30px rgba(224, 224, 224, 0.4); 
             background: linear-gradient(135deg, #444 0%, #777 50%, #444 100%);
             color: #fff;
         }
         .hextech-card.gold { 
             border-color: #ffd700; 
-            box-shadow: 0 0 15px rgba(255, 215, 0, 0.4); 
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.4); 
             background: linear-gradient(135deg, #554400 0%, #997700 50%, #554400 100%);
             color: #fff;
         }
         .hextech-card.prismatic { 
             border-color: #00ffff; 
-            box-shadow: 0 0 20px rgba(0, 255, 255, 0.6); 
+            box-shadow: 0 0 40px rgba(0, 255, 255, 0.6); 
             background: linear-gradient(135deg, #2c3e50 0%, #4a148c 50%, #b71c1c 100%);
             color: #fff;
             text-shadow: 0 1px 3px rgba(0,0,0,0.8);
         }
         
         .hextech-icon {
-            width: 60px;
-            height: 60px;
-            margin-bottom: 15px;
+            width: 120px;
+            height: 120px;
+            margin-bottom: 30px;
             border-radius: 50%;
-            background: rgba(0,0,0,0.3); /* Transparent dark to blend with gradient */
+            background: rgba(0,0,0,0.3);
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 24px;
-            border: 2px solid rgba(255,255,255,0.2);
+            font-size: 48px;
+            border: 4px solid rgba(255,255,255,0.2);
         }
         
-        .hextech-name { font-size: 20px; font-weight: bold; margin-bottom: 10px; text-shadow: 0 2px 2px rgba(0,0,0,0.5); }
-        .hextech-desc { font-size: 14px; line-height: 1.4; color: #eee; text-shadow: 0 1px 1px rgba(0,0,0,0.5); }
+        .hextech-name { font-size: 40px; font-weight: bold; margin-bottom: 20px; text-shadow: 0 2px 2px rgba(0,0,0,0.5); }
+        .hextech-desc { font-size: 28px; line-height: 1.4; color: #eee; text-shadow: 0 1px 1px rgba(0,0,0,0.5); }
         
         /* Player Hextech Icons（状态栏内 2 倍） */
         .player-hextechs {
@@ -542,16 +554,28 @@
             color: #ffd700;
             text-shadow: 0 1px 2px rgba(0,0,0,0.5);
         }
-        /* --- 桌面端：round-info / deck-info 位置，间隔加大避免重叠 --- */
+        /* --- 位置：局数在上、剩余牌数在下（已交换）；左移不挡左边玩家，房间号右移不挡右边玩家 --- */
+        #deck-info {
+            position: absolute;
+            top: 110px;
+            left: 8px;
+            z-index: 100;
+        }
+        #round-info {
+            position: absolute;
+            top: 20px;
+            left: 8px;
+            z-index: 5;
+        }
+        #room-id-display {
+            position: absolute;
+            top: 20px;
+            right: 8px;
+        }
         @media screen and (min-width: 1025px) {
-            #deck-info { top: 20px; left: 20px; }
-            #round-info {
-                position: absolute;
-                top: 110px;
-                left: 20px;
-                transform: none;
-                z-index: 5;
-            }
+            #deck-info { top: 110px; left: 8px; }
+            #round-info { top: 20px; left: 8px; }
+            #room-id-display { top: 20px; right: 8px; }
         }
 
         /* --- 移动端：等比例缩放 + 全屏自适应（与电脑端同布局，整体缩放填满屏幕）--- */
@@ -623,8 +647,8 @@
 
 <div id="game-container">
     <div id="top-player" class="player-area">
-        <div class="info" id="info-2">
-            <span class="player-name">电脑 (上)</span> <span class="dealer-badge" id="dealer-badge-2" style="display:none; color:#ff4d4d; border:1px solid #ff4d4d; border-radius:3px; padding:0 4px; margin:0 5px; font-size:12px;">庄</span> <span class="score-display" style="color:#ffd700; font-weight:bold;">0</span>
+        <div class="info info-row" id="info-2">
+            <div class="info-head"><span class="player-name">电脑 (上)</span> <span class="dealer-badge" id="dealer-badge-2" style="display:none; color:#ff4d4d; border:1px solid #ff4d4d; border-radius:3px; padding:0 4px; margin:0 5px; font-size:12px;">庄</span> <span class="score-display" style="color:#ffd700; font-weight:bold;">0</span></div>
             <div class="player-hextechs" id="hextechs-2"></div>
         </div>
         <div class="hand" id="hand-2"></div>
@@ -642,9 +666,9 @@
         </div>
     </div>
 
-    <div id="deck-info" style="position:absolute; top:20px; left:20px; z-index:100; pointer-events:none;">剩余: --</div>
-    <div id="round-info" style="position:absolute; top:110px; left:20px; z-index:5; pointer-events:none;">第 1 / 16 局</div>
-    <div id="room-id-display" style="position:absolute; top:20px; right:20px; pointer-events:none; display:none;">房间号: —</div>
+    <div id="deck-info" style="pointer-events:none;">剩余: --</div>
+    <div id="round-info" style="pointer-events:none;">第 1 / 16 局</div>
+    <div id="room-id-display" style="pointer-events:none; display:none;">房间号: —</div>
     <div id="center-area">
         <!-- Center Info / Deck Counter could go here -->
         <div style="grid-column: 2/4; grid-row: 2/4; display:flex; flex-direction:column; justify-content:center; align-items:center; opacity:0.8; pointer-events:none; z-index: -1;">
@@ -681,15 +705,15 @@
         </div>
         <div class="discard-zone" id="discard-0"></div> <!-- Bottom Discards -->
         <div class="hand" id="hand-0"></div>
-        <div class="info" id="info-0">
-            <span class="player-name">玩家 (你)</span> <span class="dealer-badge" id="dealer-badge-0" style="display:none; color:#ff4d4d; border:1px solid #ff4d4d; border-radius:3px; padding:0 4px; margin:0 5px; font-size:12px;">庄</span> <span class="score-display" style="color:#ffd700; font-weight:bold;">0</span>
+        <div class="info info-row" id="info-0">
+            <div class="info-head"><span class="player-name">玩家 (你)</span> <span class="dealer-badge" id="dealer-badge-0" style="display:none; color:#ff4d4d; border:1px solid #ff4d4d; border-radius:3px; padding:0 4px; margin:0 5px; font-size:12px;">庄</span> <span class="score-display" style="color:#ffd700; font-weight:bold;">0</span></div>
             <div class="player-hextechs" id="hextechs-0"></div>
         </div>
     </div>
 
     <div id="hextech-modal">
-        <div style="color:white; font-size:32px; font-weight:bold;">选择你的海克斯强化</div>
-        <div id="hextech-timer" style="color:#ffd700; font-size:24px; margin-top:10px;">40s</div>
+        <div style="color:white; font-size:64px; font-weight:bold;">选择你的海克斯强化</div>
+        <div id="hextech-timer" style="color:#ffd700; font-size:48px; margin-top:20px;">40s</div>
         <div class="hextech-container" id="hextech-selection-container">
             <!-- Cards will be injected here -->
         </div>
@@ -2477,14 +2501,14 @@
                     if (h.tier === 'prismatic') { color = '#00ffff'; tierName = '彩色'; }
 
                     const msgEl = document.getElementById('message-area');
-                    msgEl.style.zIndex = '3000'; // Ensure it's on top
+                    msgEl.style.zIndex = '3000';
                     msgEl.innerHTML = `
-                        <div style="font-size: 14px; color: #aaa; margin-bottom: 8px; border-bottom: 1px solid #555; padding-bottom: 5px;">
+                        <div style="font-size: 28px; color: #aaa; margin-bottom: 16px; border-bottom: 2px solid #555; padding-bottom: 10px;">
                             ${p.name} 的 ${tierName}海克斯
                         </div>
-                        <h3 style="color:${color}; margin: 10px 0; font-size: 24px; text-shadow: 0 0 5px ${color}40;">${h.name}</h3>
-                        <p style="font-size: 16px; line-height: 1.6; color: #eee; margin-bottom: 20px;">${h.desc}</p>
-                        <button class="action-btn" style="background:linear-gradient(to bottom, #555, #333); border:1px solid #777; padding: 8px 30px; border-radius: 20px; cursor: pointer; color: white;" onclick="document.getElementById('message-area').style.display='none'">关闭</button>
+                        <h3 style="color:${color}; margin: 20px 0; font-size: 48px; text-shadow: 0 0 5px ${color}40;">${h.name}</h3>
+                        <p style="font-size: 32px; line-height: 1.6; color: #eee; margin-bottom: 40px;">${h.desc}</p>
+                        <button class="action-btn" style="background:linear-gradient(to bottom, #555, #333); border:2px solid #777; padding: 16px 60px; border-radius: 40px; cursor: pointer; color: white; font-size: 32px;" onclick="document.getElementById('message-area').style.display='none'">关闭</button>
                     `;
                     msgEl.style.display = 'block';
                 };
