@@ -1320,8 +1320,8 @@ io.on('connection', (socket) => {
         }
         else if (type === 'archmageSwap') {
             try {
-            const inGrace = room.archmageTimedOutAt != null && room.archmageTimedOutPlayerId === player.id && (Date.now() - room.archmageTimedOutAt) < 3000;
-            if ((!room.waitingForArchmage || room.waitingForArchmage !== player.id) && !inGrace) {
+            const inGrace = room.archmageTimedOutAt != null && room.archmageTimedOutPlayerId == player.id && (Date.now() - room.archmageTimedOutAt) < 3000;
+            if ((room.waitingForArchmage == null || room.waitingForArchmage != player.id) && !inGrace) {
                 console.log(`[${roomName}] archmageSwap rejected: waitingForArchmage=${room.waitingForArchmage}, player.id=${player.id}`);
                 io.to(player.socketId).emit('error', '当前无需交换（可能已超时，请收到提示后尽快选完 3 张）');
                 return;

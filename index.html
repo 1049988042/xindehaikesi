@@ -529,9 +529,9 @@
             100% { transform: rotate(0deg); }
         }
 
-        /* 剩余牌数、局数、房间号：原一半大小，无黑底；局数与剩余间距缩小不重叠即可 */
+        /* 剩余牌数、局数、房间号：与房间号同大（16px），无黑底；往中间约两字避免贴边 */
         #deck-info {
-            font-size: 18px !important;
+            font-size: 16px !important;
             font-weight: bold;
             padding: 4px 8px !important;
             background: transparent !important;
@@ -540,11 +540,11 @@
             text-shadow: 0 1px 2px rgba(0,0,0,0.5);
             position: fixed;
             top: 42px;
-            left: 4px;
+            left: 24px;
             z-index: 150;
         }
         #round-info {
-            font-size: 20px !important;
+            font-size: 16px !important;
             font-weight: bold;
             padding: 2px 8px !important;
             background: transparent !important;
@@ -552,7 +552,7 @@
             text-shadow: 0 1px 2px rgba(0,0,0,0.5);
             position: fixed;
             top: 8px;
-            left: 4px;
+            left: 24px;
             z-index: 150;
         }
         #room-id-display {
@@ -563,7 +563,7 @@
             text-shadow: 0 1px 2px rgba(0,0,0,0.5);
             position: fixed;
             top: 8px;
-            right: 4px;
+            right: 24px;
             z-index: 150;
         }
 
@@ -613,10 +613,10 @@
                 font-size: 22px !important;
                 white-space: nowrap;
             }
-            /* 移动端：局数/剩余/房间号往中间收一点，不超出屏幕 */
-            #deck-info { left: 12px !important; }
-            #round-info { left: 12px !important; }
-            #room-id-display { right: 12px !important; }
+            /* 移动端：再往中间约两字，不超出屏幕 */
+            #deck-info { left: 36px !important; }
+            #round-info { left: 36px !important; }
+            #room-id-display { right: 36px !important; }
         }
 
         /* --- 移动端竖屏时：强制横屏游玩（整页旋转 90° 显示）--- */
