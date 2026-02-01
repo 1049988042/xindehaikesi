@@ -1223,6 +1223,10 @@
         state.codeInterferenceActive = !!data.codeInterferenceActive;
         state.confuseMyHand = !!data.confuseMyHand;
         state.waitingForArchmage = data.waitingForArchmage;
+        // 大魔法师：与服务器同步选牌状态，避免服务端已超时但客户端仍显示选牌导致提交被拒
+        var amWaiting = (data.waitingForArchmage != null && String(data.waitingForArchmage) === String(state.myServerId));
+        state.archmageSwapMode = !!amWaiting;
+        if (!amWaiting) state.archmageSelectedIndices = [];
         
         if (data.roomName) {
             var roomIdEl = document.getElementById('room-id-display');
