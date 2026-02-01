@@ -551,6 +551,18 @@
                 justify-content: center;
             }
         }
+
+        /* --- 移动端竖屏时：强制横屏游玩（整页旋转 90° 显示）--- */
+        @media screen and (max-width: 1024px) and (orientation: portrait) {
+            #game-viewport {
+                width: 100vh;
+                height: 100vw;
+                left: 50%;
+                top: 50%;
+                transform: translate(-50%, -50%) rotate(90deg);
+                transform-origin: center center;
+            }
+        }
     </style>
     <script src="/socket.io/socket.io.js"></script>
 </head>
@@ -658,12 +670,19 @@
 </div>
 
 <script>
-    // --- 移动端等比例缩放：与电脑端同布局，整体缩放填满屏幕 ---
+    // --- 移动端等比例缩放：与电脑端同布局，整体缩放填满屏幕；竖屏时按旋转后横屏空间计算 ---
     (function () {
         var DESIGN_W = 1400, DESIGN_H = 900;
         function updateGameScale() {
             var w = window.innerWidth, h = window.innerHeight;
-            var scale = w <= 1024 ? Math.min(w / DESIGN_W, h / DESIGN_H) : 1;
+            var scale = 1;
+            if (w <= 1024) {
+                if (h > w) {
+                    scale = Math.min(h / DESIGN_W, w / DESIGN_H);
+                } else {
+                    scale = Math.min(w / DESIGN_W, h / DESIGN_H);
+                }
+            }
             document.documentElement.style.setProperty('--game-scale', String(scale));
         }
         if (document.readyState === 'loading') {
