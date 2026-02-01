@@ -909,7 +909,8 @@ function startNextRound(roomName, winnerId, winType) {
         if (dealerDraw) dealer.hand.push(dealerDraw);
         room.state.currentPlayerDrewThisTurn = true;
         room.waitingForArchmage = dealer.id;
-        io.to(dealer.socketId).emit('archmageSwapRequest', { timeout: 15000 });
+        const ARCHMAGE_TIMEOUT_MS = 25000;
+        io.to(dealer.socketId).emit('archmageSwapRequest', { timeout: ARCHMAGE_TIMEOUT_MS });
         room.archmageTimer = setTimeout(() => {
             const r = rooms[roomName];
             if (r && r.waitingForArchmage != null) {
@@ -918,6 +919,7 @@ function startNextRound(roomName, winnerId, winType) {
                 r.waitingForArchmage = null;
                 if (r.archmageTimer) clearTimeout(r.archmageTimer);
                 r.archmageTimer = null;
+                io.to(roomName).emit('systemMessage', '【大魔法师】交换超时，已跳过');
                 if (_broadcastGameState) _broadcastGameState(roomName);
                 if (pl && pl.isTing && _handleDiscard) {
                     setTimeout(() => {
@@ -930,7 +932,7 @@ function startNextRound(roomName, winnerId, winType) {
                     }, 1000);
                 } else if (_startTurnTimer) _startTurnTimer(roomName, pl.id);
             }
-        }, 15000);
+        }, ARCHMAGE_TIMEOUT_MS);
         if (_broadcastGameState) _broadcastGameState(roomName);
         return;
     }
@@ -1162,7 +1164,8 @@ io.on('connection', (socket) => {
                         if (dealerDraw) dealer.hand.push(dealerDraw);
                         room.state.currentPlayerDrewThisTurn = true;
                         room.waitingForArchmage = dealer.id;
-                        io.to(dealer.socketId).emit('archmageSwapRequest', { timeout: 15000 });
+                        const ARCHMAGE_TIMEOUT_MS_R1 = 25000;
+                        io.to(dealer.socketId).emit('archmageSwapRequest', { timeout: ARCHMAGE_TIMEOUT_MS_R1 });
                         room.archmageTimer = setTimeout(() => {
                             const r = rooms[roomName];
                             if (r && r.waitingForArchmage != null) {
@@ -1171,6 +1174,7 @@ io.on('connection', (socket) => {
                                 r.waitingForArchmage = null;
                                 if (r.archmageTimer) clearTimeout(r.archmageTimer);
                                 r.archmageTimer = null;
+                                io.to(roomName).emit('systemMessage', '【大魔法师】交换超时，已跳过');
                                 broadcastGameState(roomName);
                                 if (pl && pl.isTing) {
                                     setTimeout(() => {
@@ -1185,7 +1189,7 @@ io.on('connection', (socket) => {
                                     startTurnTimer(roomName, pl.id);
                                 }
                             }
-                        }, 15000);
+                        }, ARCHMAGE_TIMEOUT_MS_R1);
                     } else {
                         const dealerDraw = drawTileFromDeck(room, dealer);
                         if (dealerDraw) dealer.hand.push(dealerDraw);
@@ -1309,25 +1313,28 @@ io.on('connection', (socket) => {
             }
         }
         else if (type === 'archmageSwap') {
+            try {
             if (!room.waitingForArchmage || room.waitingForArchmage !== player.id) {
-                io.to(player.socketId).emit('error', '当前无需交换');
+                console.log(`[${roomName}] archmageSwap rejected: waitingForArchmage=${room.waitingForArchmage}, player.id=${player.id}`);
+                io.to(player.socketId).emit('error', '当前无需交换（可能已超时，请收到提示后尽快选完 3 张）');
                 return;
             }
             if (!player.hextechs || !player.hextechs.includes('prism_new_15')) {
                 io.to(player.socketId).emit('error', '无大魔法师');
                 return;
             }
-            const indices = data.handIndices;
-            if (!Array.isArray(indices) || indices.length !== 3) {
+            const rawIndices = (data && data.handIndices) || (Array.isArray(data) ? data : null);
+            if (!Array.isArray(rawIndices) || rawIndices.length !== 3) {
                 io.to(player.socketId).emit('error', '请选择 3 张手牌');
                 return;
             }
+            const indices = rawIndices.map(i => typeof i === 'number' ? i : parseInt(i, 10));
             const uniq = [...new Set(indices)];
             if (uniq.length !== 3) {
                 io.to(player.socketId).emit('error', '请选择 3 张不同的手牌');
                 return;
             }
-            const valid = uniq.every(i => Number.isInteger(i) && i >= 0 && i < player.hand.length);
+            const valid = uniq.every(i => Number.isInteger(i) && !Number.isNaN(i) && i >= 0 && i < player.hand.length);
             if (!valid) {
                 io.to(player.socketId).emit('error', '无效的手牌索引');
                 return;
@@ -1339,7 +1346,8 @@ io.on('connection', (socket) => {
                 io.to(player.socketId).emit('error', '对方手牌不足 3 张');
                 return;
             }
-            const [i0, i1, i2] = uniq;
+            // 索引升序，先读后写，避免覆盖导致只换一张
+            const [i0, i1, i2] = uniq.sort((a, b) => a - b);
             const myTiles = [player.hand[i0], player.hand[i1], player.hand[i2]];
             const oppIndices = [];
             while (oppIndices.length < 3) {
@@ -1350,6 +1358,7 @@ io.on('connection', (socket) => {
             player.hand[i0] = oppTiles[0];
             player.hand[i1] = oppTiles[1];
             player.hand[i2] = oppTiles[2];
+            sortHand(player.hand);
             oppIndices.sort((a, b) => b - a);
             for (const idx of oppIndices) opponent.hand.splice(idx, 1);
             opponent.hand.push(...myTiles);
@@ -1372,6 +1381,11 @@ io.on('connection', (socket) => {
                 }, 1000);
             } else if (startTurnTimer) {
                 startTurnTimer(roomName, player.id);
+            }
+            return;
+            } catch (err) {
+                console.error(`[${roomName}] archmageSwap error:`, err);
+                io.to(player.socketId).emit('error', '大魔法师交换失败，请重试');
             }
             return;
         }
@@ -1725,7 +1739,8 @@ io.on('connection', (socket) => {
                  if (drawnTile) nextPlayer.hand.push(drawnTile);
                  room.state.currentPlayerDrewThisTurn = true;
                  room.waitingForArchmage = nextPlayer.id;
-                 io.to(nextPlayer.socketId).emit('archmageSwapRequest', { timeout: 15000 });
+                 const ARCHMAGE_TIMEOUT_MS_NEXT = 25000;
+                 io.to(nextPlayer.socketId).emit('archmageSwapRequest', { timeout: ARCHMAGE_TIMEOUT_MS_NEXT });
                  room.archmageTimer = setTimeout(() => {
                      const r = rooms[roomName];
                      if (r && r.waitingForArchmage !== undefined && r.waitingForArchmage !== null) {
@@ -1733,6 +1748,7 @@ io.on('connection', (socket) => {
                          if (pl) pl.archmageUsedThisRound = true;
                          r.waitingForArchmage = null;
                          r.archmageTimer = null;
+                         io.to(roomName).emit('systemMessage', '【大魔法师】交换超时，已跳过');
                          broadcastGameState(roomName);
                          if (pl && pl.isTing) {
                              setTimeout(() => {
@@ -1747,7 +1763,7 @@ io.on('connection', (socket) => {
                              startTurnTimer(roomName, pl.id);
                          }
                      }
-                 }, 15000);
+                 }, ARCHMAGE_TIMEOUT_MS_NEXT);
                  broadcastGameState(roomName);
                  return;
              }
