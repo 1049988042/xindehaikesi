@@ -902,8 +902,7 @@
             if (data.isTing) {
                 speak('听', { noCancel: true });
             } else {
-                SoundManager.playTileSound(data.tile);
-                speak(data.tile, { noCancel: true });
+                if (!SoundManager.playTileSound(data.tile)) speak(data.tile, { noCancel: true });
             }
         }
     });
@@ -912,11 +911,10 @@
     socket.on('playerPerformedAction', function(data) {
         if (!data || !data.type) return;
         var t = String(data.type);
-        if (t === 'peng') { SoundManager.playActionSound('peng'); speak('碰', { noCancel: true }); return; }
-        if (t === 'gang') { SoundManager.playActionSound('gang'); speak('杠', { noCancel: true }); return; }
+        if (t === 'peng') { SoundManager.playActionSound('peng'); return; }
+        if (t === 'gang') { SoundManager.playActionSound('gang'); return; }
         if (t === 'hu') {
             SoundManager.playActionSound('hu');
-            speak('胡', { noCancel: true });
             hideInteractionButtons(); // 有人胡了立即收掉胡/过等，不等 roundEnd
         }
     });
@@ -1483,7 +1481,7 @@
         '一万': 1, '二万': 2, '三万': 3, '四万': 4, '五万': 5, '六万': 6, '七万': 7, '八万': 8, '九万': 9,
         '一条': 11, '二条': 12, '三条': 13, '四条': 14, '五条': 15, '六条': 16, '七条': 17, '八条': 18, '九条': 19,
         '一筒': 21, '二筒': 22, '三筒': 23, '四筒': 24, '五筒': 25, '六筒': 26, '七筒': 27, '八筒': 28, '九筒': 29,
-        '东': 31, '南': 32, '西': 33, '北': 34, '中': 35, '发': 36, '白': 37, '白板': 37
+        '东': 31, '南': 32, '西': 33, '北': 34, '中': 35, '发': 36, '发财': 36, '白': 37, '白板': 37
     };
 
     const SoundManager = {
@@ -1537,17 +1535,26 @@
             this.playTone(1200, 'sine', 0.05);
             setTimeout(() => this.playTone(1000, 'sine', 0.05), 50);
         },
+        _maleBase: function() {
+            var p = (window.location && window.location.pathname) || '';
+            var i = p.lastIndexOf('/');
+            return i >= 0 ? p.slice(0, i + 1) : './';
+        },
         // 播放男声牌名（male/sound_man_1.mp3 ~ 37.mp3）
         playTileSound: function(tileName) {
             var id = TILE_SOUND_MAP[tileName];
-            if (id == null) return;
-            var a = new Audio('male/sound_man_' + id + '.mp3');
+            if (id == null) return false;
+            var url = this._maleBase() + 'male/sound_man_' + id + '.mp3';
+            var a = new Audio(url);
             a.play().catch(function() {});
+            return true;
         },
         // 播放男声动作：peng / gang / hu（male/sound_man_peng.mp3 等）
         playActionSound: function(actionType) {
-            var a = new Audio('male/sound_man_' + actionType + '.mp3');
+            var url = this._maleBase() + 'male/sound_man_' + actionType + '.mp3';
+            var a = new Audio(url);
             a.play().catch(function() {});
+            return true;
         }
     };
 
