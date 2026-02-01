@@ -554,28 +554,24 @@
             color: #ffd700;
             text-shadow: 0 1px 2px rgba(0,0,0,0.5);
         }
-        /* --- 位置：局数/剩余牌数贴屏幕最左，房间号贴最右 --- */
+        /* --- 局数/剩余牌数/房间号：fixed 相对视口，贴屏幕最左/最右 --- */
         #deck-info {
-            position: absolute;
+            position: fixed;
             top: 110px;
             left: 4px;
-            z-index: 100;
+            z-index: 150;
         }
         #round-info {
-            position: absolute;
+            position: fixed;
             top: 20px;
             left: 4px;
-            z-index: 5;
+            z-index: 150;
         }
         #room-id-display {
-            position: absolute;
+            position: fixed;
             top: 20px;
             right: 4px;
-        }
-        @media screen and (min-width: 1025px) {
-            #deck-info { top: 110px; left: 4px; }
-            #round-info { top: 20px; left: 4px; }
-            #room-id-display { top: 20px; right: 4px; }
+            z-index: 150;
         }
 
         /* --- 移动端：等比例缩放 + 全屏自适应（与电脑端同布局，整体缩放填满屏幕）--- */
@@ -681,9 +677,6 @@
         </div>
     </div>
 
-    <div id="deck-info" style="pointer-events:none;">剩余: --</div>
-    <div id="round-info" style="pointer-events:none;">第 1 / 16 局</div>
-    <div id="room-id-display" style="pointer-events:none; display:none;">房间号: —</div>
     <div id="center-area">
         <!-- Center Info / Deck Counter could go here -->
         <div style="grid-column: 2/4; grid-row: 2/4; display:flex; flex-direction:column; justify-content:center; align-items:center; opacity:0.8; pointer-events:none; z-index: -1;">
@@ -740,6 +733,10 @@
         <!-- Messages injected by JS -->
     </div>
 </div>
+    <!-- 局数/剩余牌数/房间号：挂在 viewport 下，fixed 贴屏幕边缘 -->
+    <div id="deck-info" style="pointer-events:none;">剩余: --</div>
+    <div id="round-info" style="pointer-events:none;">第 1 / 16 局</div>
+    <div id="room-id-display" style="pointer-events:none; display:none;">房间号: —</div>
 </div>
 
 <script>
