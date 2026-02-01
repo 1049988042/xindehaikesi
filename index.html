@@ -26,6 +26,12 @@
             user-select: none;
         }
 
+        #game-viewport {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+        }
         #game-container {
             position: relative;
             flex: 1;
@@ -502,151 +508,55 @@
             100% { transform: rotate(0deg); }
         }
 
-        /* --- Mobile Responsive Support & Force Landscape --- */
-        
-        /* 1. Base Mobile Overrides (Apply to all narrow/mobile screens) */
-        @media screen and (max-width: 1024px), screen and (orientation: portrait) {
-            :root {
-                /* 移动端麻将牌尺寸调整 (Adjusted) */
-                --tile-w: 8.5vmin; 
-                --tile-h: 12vmin;
-                --tile-depth: 1.5vmin;
-            }
-            /* 自己手牌等比例放大至面积约两倍，其他位置不变 */
-            #bottom-player .hand { --tile-w: calc(8.5vmin * 1.414); --tile-h: calc(12vmin * 1.414); }
-
-            /* Convert fixed pixel containers to relative units */
-            #center-area {
-                width: 35vmin !important;
-                height: 35vmin !important;
-            }
-
-            /* Round Info Positioning (Physical Top-Left) */
-            #round-info {
-                position: absolute !important;
-                left: 3vmin !important;
-                bottom: 3vmin !important; /* Game Bottom-Left */
-                top: auto !important;
-                margin: 0 !important;
-                transform: none !important;
-                font-size: 4vmin !important;
-                z-index: 100;
-                background: rgba(0,0,0,0.6) !important;
-                white-space: nowrap;
-            }
-
-            .discard-wrapper {
-                width: 20vmin !important;
-                height: 38vmin !important;
-                margin: 0 1vmin !important;
-            }
-
-            #discard-0, #discard-2 {
-                width: 60vmin !important;
-                margin: 1vmin 0 !important;
-            }
-
-            /* Adjust side discards transform */
-            #discard-1 { 
-                width: 38vmin !important; height: 20vmin !important;
-                transform: rotate(-90deg) translate(0, -20vmin) !important; 
-            }
-            #discard-3 { 
-                width: 38vmin !important; height: 20vmin !important;
-                transform: rotate(90deg) translate(0, -20vmin) !important; 
-            }
-
-            /* Controls */
-            #controls {
-                bottom: 18vmin !important; 
-                gap: 2vmin !important;
-            }
-            #controls button {
-                width: 14vmin !important;
-                height: 14vmin !important;
-                font-size: 5vmin !important;
-                border-width: 2px !important;
-            }
-            #btn-hu {
-                width: 16vmin !important;
-                height: 16vmin !important;
-                font-size: 7vmin !important;
-            }
-
-            /* Players */
-            .player-area { padding: 0 !important; }
-            .hand { min-height: 0 !important; }
-            
-            #top-player { top: 1vmin !important; }
-            #bottom-player { bottom: 1vmin !important; }
-            #left-player { left: 1vmin !important; }
-            #right-player { right: 1vmin !important; }
-
-            /* Fix hand tile scaling & spacing for Side Players */
-            #left-player .hand .tile, #right-player .hand .tile {
-                margin: -2.2vmin 0 !important; /* Compensate for scale to prevent gaps */
-                transform: scale(0.65); /* Scale down to fit */
-            }
-            
-            #top-player .hand .tile, #bottom-player .hand .tile {
-                margin: 0 -0.5vmin !important;
-                transform: scale(0.95);
-            }
-
-            /* Hide Info/Hextechs to save space if needed, or scale down */
-            .info {
-                transform: scale(0.65);
-                transform-origin: center;
-                white-space: nowrap;
-                padding: 1px 3px !important;
-            }
-            
-            /* Specific fix for side players info position */
-            #left-player .info { margin-right: -4vmin; z-index: 10; }
-            #right-player .info { margin-left: -4vmin; z-index: 10; }
-        }
-
-        /* Desktop specific style for round-info */
+        /* --- 桌面端：round-info 位置 --- */
         @media screen and (min-width: 1025px) {
             #round-info {
                 position: absolute;
-                top: 80px; /* Moved down to avoid overlap with deck-info */
+                top: 80px;
                 left: 20px;
                 transform: none;
                 z-index: 5;
             }
         }
 
-        /* 2. Force Landscape Mode for Portrait Screens */
-        @media screen and (orientation: portrait) {
-            body {
+        /* --- 移动端：等比例缩放 + 全屏自适应（与电脑端同布局，整体缩放填满屏幕）--- */
+        @media screen and (max-width: 1024px) {
+            body { overflow: hidden; }
+            #game-viewport {
+                position: fixed;
+                left: 0;
+                top: 0;
                 width: 100vw;
                 height: 100vh;
                 overflow: hidden;
-                background: #000; /* Black background for out-of-bounds */
-            }
-
-            #game-container, #start-screen {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                /* Swap dimensions: Width = Height of screen, Height = Width of screen */
-                width: 100vh;
-                height: 100vw;
-                transform: translate(-50%, -50%) rotate(90deg);
-                transform-origin: center center;
-                overflow: hidden;
                 background: var(--bg-color);
-                background-image: var(--table-texture);
             }
-
-            /* Adjust controls orientation if needed, but rotating container handles it */
+            #game-viewport #start-screen,
+            #game-viewport #game-container {
+                position: absolute;
+                left: 50%;
+                top: 50%;
+                width: 1400px;
+                height: 900px;
+                margin-left: -700px;
+                margin-top: -450px;
+                transform: scale(var(--game-scale, 1));
+                transform-origin: center center;
+            }
+            #game-viewport #game-container { position: absolute; }
+            #game-viewport #start-screen {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+            }
         }
     </style>
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
 
+<div id="game-viewport">
 <div id="start-screen">
     <div style="font-size: 48px; margin-bottom: 20px; font-weight:bold; text-shadow: 0 5px 10px rgba(0,0,0,0.5);">🀄 海克斯麻将</div>
     <div style="margin-bottom: 30px; font-size: 16px; color: #eee; text-align:center; max-width: 80%;">
@@ -745,8 +655,26 @@
         <!-- Messages injected by JS -->
     </div>
 </div>
+</div>
 
 <script>
+    // --- 移动端等比例缩放：与电脑端同布局，整体缩放填满屏幕 ---
+    (function () {
+        var DESIGN_W = 1400, DESIGN_H = 900;
+        function updateGameScale() {
+            var w = window.innerWidth, h = window.innerHeight;
+            var scale = w <= 1024 ? Math.min(w / DESIGN_W, h / DESIGN_H) : 1;
+            document.documentElement.style.setProperty('--game-scale', String(scale));
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', updateGameScale);
+        } else {
+            updateGameScale();
+        }
+        window.addEventListener('resize', updateGameScale);
+        window.addEventListener('orientationchange', function () { setTimeout(updateGameScale, 100); });
+    })();
+
     // --- 游戏常量 ---
     const SUITS = ['万', '筒', '条'];
     const NUMBERS = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
