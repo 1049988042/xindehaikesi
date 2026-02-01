@@ -318,6 +318,12 @@
             align-items: center;
             overflow: hidden;
         }
+        .tile-content img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
         
         .color-red { color: #d00; background-color: #d00; border-color: #d00; }
         .color-green { color: #080; background-color: #080; border-color: #080; }
@@ -1482,6 +1488,14 @@
         '一条': 11, '二条': 12, '三条': 13, '四条': 14, '五条': 15, '六条': 16, '七条': 17, '八条': 18, '九条': 19,
         '一筒': 21, '二筒': 22, '三筒': 23, '四筒': 24, '五筒': 25, '六筒': 26, '七筒': 27, '八筒': 28, '九筒': 29,
         '东': 31, '南': 32, '西': 33, '北': 34, '中': 35, '发': 36, '发财': 36, '白': 37, '白板': 37
+    };
+
+    // 牌名 → 牌面图片文件名（tiles/ 下）：man1-9 万，sou1-9 条，pin1-9 筒，dong/nan/xi/bei/zhong/fa/bai
+    var TILE_IMAGE_MAP = {
+        '一万': 'man1', '二万': 'man2', '三万': 'man3', '四万': 'man4', '五万': 'man5', '六万': 'man6', '七万': 'man7', '八万': 'man8', '九万': 'man9',
+        '一条': 'sou1', '二条': 'sou2', '三条': 'sou3', '四条': 'sou4', '五条': 'sou5', '六条': 'sou6', '七条': 'sou7', '八条': 'sou8', '九条': 'sou9',
+        '一筒': 'pin1', '二筒': 'pin2', '三筒': 'pin3', '四筒': 'pin4', '五筒': 'pin5', '六筒': 'pin6', '七筒': 'pin7', '八筒': 'pin8', '九筒': 'pin9',
+        '东': 'dong', '南': 'nan', '西': 'xi', '北': 'bei', '中': 'zhong', '发财': 'fa', '白板': 'bai'
     };
 
     const SoundManager = {
@@ -4109,6 +4123,18 @@
 
     function getTileVisual(tile) {
         if (!tile) return '';
+        var imgName = TILE_IMAGE_MAP[tile];
+        if (imgName) {
+            var base;
+            if (window.location && window.location.protocol === 'file:') {
+                base = './';
+            } else {
+                var p = (window.location && window.location.pathname) || '';
+                var i = p.lastIndexOf('/');
+                base = i >= 0 ? p.slice(0, i + 1) : '/';
+            }
+            return '<div class="tile-content"><img src="' + base + 'tiles/' + imgName + '.png" alt="' + tile + '"></div>';
+        }
         const suit = tile.slice(-1);
         const numStr = tile.slice(0, -1);
         const numMap = {'一':1, '二':2, '三':3, '四':4, '五':5, '六':6, '七':7, '八':8, '九':9};
