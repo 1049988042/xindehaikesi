@@ -1367,14 +1367,18 @@ io.on('connection', (socket) => {
                 if (!oppIndices.includes(r)) oppIndices.push(r);
             }
             oppIndices.sort((a, b) => a - b);
+            const oppIndicesSet = new Set(oppIndices);
             const oppTiles = [opponent.hand[oppIndices[0]], opponent.hand[oppIndices[1]], opponent.hand[oppIndices[2]]];
-            player.hand[i0] = oppTiles[0];
-            player.hand[i1] = oppTiles[1];
-            player.hand[i2] = oppTiles[2];
-            sortHand(player.hand);
-            for (let k = oppIndices.length - 1; k >= 0; k--) opponent.hand.splice(oppIndices[k], 1);
-            opponent.hand.push(...myTiles);
-            sortHand(opponent.hand);
+            const newPlayerHand = player.hand.slice();
+            newPlayerHand[i0] = oppTiles[0];
+            newPlayerHand[i1] = oppTiles[1];
+            newPlayerHand[i2] = oppTiles[2];
+            sortHand(newPlayerHand);
+            player.hand = newPlayerHand;
+            const newOppHand = opponent.hand.filter((_, idx) => !oppIndicesSet.has(idx));
+            newOppHand.push(...myTiles);
+            sortHand(newOppHand);
+            opponent.hand = newOppHand;
             player.archmageUsedThisRound = true;
             room.waitingForArchmage = null;
             room.archmageTimedOutAt = null;
@@ -1422,6 +1426,11 @@ io.on('connection', (socket) => {
             if (gangType === 'ming') {
                 if (!canMingGang) {
                     io.to(player.socketId).emit('error', '当前不能明杠（需他人打出该牌时选择杠）');
+                    return;
+                }
+                const mingTile = room.state.lastDiscard && room.state.lastDiscard.tile;
+                if (mingTile && player.hand.filter(t => t === mingTile).length < 3) {
+                    io.to(player.socketId).emit('error', '明杠需要手牌中有 3 张与打出牌相同');
                     return;
                 }
             } else if (gangType === 'an' || gangType === 'added') {

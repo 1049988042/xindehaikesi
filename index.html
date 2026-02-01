@@ -323,6 +323,7 @@
             height: 100%;
             object-fit: contain;
             display: block;
+            background: #f0e6d8;
         }
         
         .color-red { color: #d00; background-color: #d00; border-color: #d00; }
@@ -993,6 +994,11 @@
 
         if (!actions || actions.length === 0) return;
 
+        var me = state.players[0];
+        var myHand = Array.isArray(me && me.hand) ? me.hand : [];
+        var myPeng = Array.isArray(me && me.peng) ? me.peng : [];
+        function handCount(t) { return myHand.filter(function(x){ return x === t; }).length; }
+
         actions.forEach(action => {
             if (action.type === 'hu') {
                 btnHu.style.display = 'flex';
@@ -1003,8 +1009,20 @@
                 btnPeng.onclick = onPengClick;
             }
             if (action.type === 'gang') {
-                btnGang.style.display = 'flex';
-                btnGang.onclick = onGangClick;
+                var canShowGang = true;
+                if (action.data) {
+                    if (action.data.type === 'ming') {
+                        canShowGang = tile && handCount(tile) >= 3;
+                    } else if (action.data.type === 'an') {
+                        canShowGang = action.data.tile && handCount(action.data.tile) >= 4;
+                    } else if (action.data.type === 'added') {
+                        canShowGang = action.data.tile && myPeng.indexOf(action.data.tile) !== -1 && myHand.indexOf(action.data.tile) !== -1;
+                    }
+                }
+                if (canShowGang) {
+                    btnGang.style.display = 'flex';
+                    btnGang.onclick = onGangClick;
+                }
             }
         });
 
@@ -1329,8 +1347,10 @@
         }
 
         if (hasPendingAction) {
-             console.log('Received pending actions from updateState:', data.pendingActions[state.myServerId]);
-             showInteractionButtons(data.pendingActions[state.myServerId], data.lastDiscard && data.lastDiscard.tile ? data.lastDiscard.tile : null, 8000);
+             var myActions = data.pendingActions[state.myServerId];
+             state.pendingServerActions = Array.isArray(myActions) ? myActions.slice() : [];
+             console.log('Received pending actions from updateState:', state.pendingServerActions);
+             showInteractionButtons(myActions, data.lastDiscard && data.lastDiscard.tile ? data.lastDiscard.tile : null, 8000);
         }
 
         if (state.currentPlayerIndex === state.myServerId) {
@@ -1499,8 +1519,28 @@
         '一万': 'man1', '二万': 'man2', '三万': 'man3', '四万': 'man4', '五万': 'man5', '六万': 'man6', '七万': 'man7', '八万': 'man8', '九万': 'man9',
         '一条': 'sou1', '二条': 'sou2', '三条': 'sou3', '四条': 'sou4', '五条': 'sou5', '六条': 'sou6', '七条': 'sou7', '八条': 'sou8', '九条': 'sou9',
         '一筒': 'pin1', '二筒': 'pin2', '三筒': 'pin3', '四筒': 'pin4', '五筒': 'pin5', '六筒': 'pin6', '七筒': 'pin7', '八筒': 'pin8', '九筒': 'pin9',
-        '东': 'dong', '南': 'nan', '西': 'xi', '北': 'bei', '中': 'zhong', '发财': 'fa', '白板': 'bai'
+        '东': 'dong', '南': 'nan', '西': 'xi', '北': 'bei', '中': 'zhong', '发财': 'fa', '白板': 'bai',
+        '东风': 'dong', '南风': 'nan', '西风': 'xi', '北风': 'bei'
     };
+
+    function preloadTileImages() {
+        var base;
+        if (window.location && window.location.protocol === 'file:') base = './';
+        else {
+            var p = (window.location && window.location.pathname) || '';
+            var i = p.lastIndexOf('/');
+            base = i >= 0 ? p.slice(0, i + 1) : '/';
+        }
+        var seen = {};
+        for (var k in TILE_IMAGE_MAP) {
+            var imgName = TILE_IMAGE_MAP[k];
+            if (seen[imgName]) continue;
+            seen[imgName] = true;
+            var img = new Image();
+            img.src = base + 'tiles/' + imgName + '.png';
+        }
+    }
+    preloadTileImages();
 
     const SoundManager = {
         ctx: null,
