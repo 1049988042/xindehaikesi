@@ -4257,6 +4257,18 @@
     const startBtn = document.getElementById('btn-start-game');
     const createBtn = document.getElementById('btn-create-room');
 
+    function requestFullscreenForMobile() {
+        if (window.innerWidth > 1024) return;
+        var el = document.documentElement;
+        try {
+            if (el.requestFullscreen) el.requestFullscreen();
+            else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+            else if (el.webkitEnterFullscreen) el.webkitEnterFullscreen();
+            else if (el.mozRequestFullScreen) el.mozRequestFullScreen();
+            else if (el.msRequestFullscreen) el.msRequestFullscreen();
+        } catch (e) {}
+    }
+
     function joinRoom(isCreate) {
         if (hasJoinedRoom) {
             var statusEl = document.getElementById('login-status');
@@ -4265,6 +4277,8 @@
             }
             return;
         }
+
+        requestFullscreenForMobile();
 
         if (startBtn && startBtn.getAttribute('data-clicked') !== 'true') {
             startBtn.setAttribute('data-clicked', 'true');
