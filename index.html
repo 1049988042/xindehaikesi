@@ -613,6 +613,10 @@
                 font-size: 22px !important;
                 white-space: nowrap;
             }
+            /* 移动端：局数/剩余/房间号往中间收一点，不超出屏幕 */
+            #deck-info { left: 12px !important; }
+            #round-info { left: 12px !important; }
+            #room-id-display { right: 12px !important; }
         }
 
         /* --- 移动端竖屏时：强制横屏游玩（整页旋转 90° 显示）--- */
@@ -3881,18 +3885,21 @@
                     
                     const label = document.createElement('span');
                     label.textContent = '万能:';
-                    label.style.marginRight = '2px';
-                    label.style.color = '#00ffff'; // Cyan for Prismatic
+                    label.style.marginRight = '4px';
+                    label.style.color = '#00ffff';
+                    label.style.lineHeight = '1';
                     wcDiv.appendChild(label);
                     
-                    // Wrapper for scaled tile（状态栏 2 倍：48x68）
+                    // 万能牌小图：高度与「万能」文字对齐，不凸出
                     const tileWrapper = document.createElement('div');
-                    tileWrapper.style.width = '48px';
-                    tileWrapper.style.height = '68px';
+                    tileWrapper.style.width = '18px';
+                    tileWrapper.style.height = '24px';
                     tileWrapper.style.position = 'relative';
+                    tileWrapper.style.flexShrink = '0';
+                    tileWrapper.style.overflow = 'hidden';
                     
                     const tileEl = createTileEl(p.wildcardTile, false);
-                    tileEl.style.transform = 'scale(0.5)';
+                    tileEl.style.transform = 'scale(0.375)';
                     tileEl.style.transformOrigin = 'top left';
                     tileEl.style.position = 'absolute';
                     tileEl.style.top = '0';
