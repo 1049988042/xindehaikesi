@@ -554,28 +554,28 @@
             color: #ffd700;
             text-shadow: 0 1px 2px rgba(0,0,0,0.5);
         }
-        /* --- 位置：局数在上、剩余牌数在下（已交换）；左移不挡左边玩家，房间号右移不挡右边玩家 --- */
+        /* --- 位置：局数/剩余牌数贴屏幕最左，房间号贴最右 --- */
         #deck-info {
             position: absolute;
             top: 110px;
-            left: 8px;
+            left: 4px;
             z-index: 100;
         }
         #round-info {
             position: absolute;
             top: 20px;
-            left: 8px;
+            left: 4px;
             z-index: 5;
         }
         #room-id-display {
             position: absolute;
             top: 20px;
-            right: 8px;
+            right: 4px;
         }
         @media screen and (min-width: 1025px) {
-            #deck-info { top: 110px; left: 8px; }
-            #round-info { top: 20px; left: 8px; }
-            #room-id-display { top: 20px; right: 8px; }
+            #deck-info { top: 110px; left: 4px; }
+            #round-info { top: 20px; left: 4px; }
+            #room-id-display { top: 20px; right: 4px; }
         }
 
         /* --- 移动端：等比例缩放 + 全屏自适应（与电脑端同布局，整体缩放填满屏幕）--- */
@@ -608,6 +608,21 @@
                 flex-direction: column;
                 align-items: center;
                 justify-content: center;
+            }
+            /* 移动端：选择海克斯标题+倒计时同一排、只一排，缩小字号 */
+            #hextech-modal-header {
+                gap: 12px;
+                flex-wrap: nowrap;
+                max-width: 100%;
+                padding: 0 10px;
+            }
+            #hextech-modal-title {
+                font-size: 22px !important;
+                white-space: nowrap;
+            }
+            #hextech-timer {
+                font-size: 22px !important;
+                white-space: nowrap;
             }
         }
 
@@ -712,8 +727,10 @@
     </div>
 
     <div id="hextech-modal">
-        <div style="color:white; font-size:64px; font-weight:bold;">选择你的海克斯强化</div>
-        <div id="hextech-timer" style="color:#ffd700; font-size:48px; margin-top:20px;">40s</div>
+        <div id="hextech-modal-header" style="display:flex; flex-direction:row; align-items:center; justify-content:center; gap:20px; flex-wrap:nowrap;">
+            <div id="hextech-modal-title" style="color:white; font-size:64px; font-weight:bold; white-space:nowrap;">选择你的海克斯强化</div>
+            <div id="hextech-timer" style="color:#ffd700; font-size:48px; font-weight:bold; white-space:nowrap;">40s</div>
+        </div>
         <div class="hextech-container" id="hextech-selection-container">
             <!-- Cards will be injected here -->
         </div>
