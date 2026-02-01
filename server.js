@@ -1359,7 +1359,8 @@ io.on('connection', (socket) => {
                 io.to(player.socketId).emit('error', '对方手牌不足 3 张');
                 return;
             }
-            const [i0, i1, i2] = uniq.sort((a, b) => a - b);
+            const sortedIndices = [...uniq].sort((a, b) => a - b);
+            const i0 = sortedIndices[0], i1 = sortedIndices[1], i2 = sortedIndices[2];
             const myTiles = [player.hand[i0], player.hand[i1], player.hand[i2]];
             const oppIndices = [];
             while (oppIndices.length < 3) {
@@ -1367,16 +1368,25 @@ io.on('connection', (socket) => {
                 if (!oppIndices.includes(r)) oppIndices.push(r);
             }
             oppIndices.sort((a, b) => a - b);
-            const oppIndicesSet = new Set(oppIndices);
-            const oppTiles = [opponent.hand[oppIndices[0]], opponent.hand[oppIndices[1]], opponent.hand[oppIndices[2]]];
-            const newPlayerHand = player.hand.slice();
-            newPlayerHand[i0] = oppTiles[0];
-            newPlayerHand[i1] = oppTiles[1];
-            newPlayerHand[i2] = oppTiles[2];
+            const o0 = oppIndices[0], o1 = oppIndices[1], o2 = oppIndices[2];
+            const oppTiles = [opponent.hand[o0], opponent.hand[o1], opponent.hand[o2]];
+            const oppIndicesSet = new Set([o0, o1, o2]);
+            // 己方新手牌：按索引逐位构建，保证三张都被替换
+            const newPlayerHand = [];
+            for (let i = 0; i < player.hand.length; i++) {
+                if (i === i0) newPlayerHand.push(oppTiles[0]);
+                else if (i === i1) newPlayerHand.push(oppTiles[1]);
+                else if (i === i2) newPlayerHand.push(oppTiles[2]);
+                else newPlayerHand.push(player.hand[i]);
+            }
             sortHand(newPlayerHand);
             player.hand = newPlayerHand;
-            const newOppHand = opponent.hand.filter((_, idx) => !oppIndicesSet.has(idx));
-            newOppHand.push(...myTiles);
+            // 对方新手牌：先保留非被选中的牌，再追加己方三张
+            const newOppHand = [];
+            for (let i = 0; i < opponent.hand.length; i++) {
+                if (!oppIndicesSet.has(i)) newOppHand.push(opponent.hand[i]);
+            }
+            newOppHand.push(myTiles[0], myTiles[1], myTiles[2]);
             sortHand(newOppHand);
             opponent.hand = newOppHand;
             player.archmageUsedThisRound = true;

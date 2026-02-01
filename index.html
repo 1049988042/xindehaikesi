@@ -68,8 +68,8 @@
 
         #top-player { top: 20px; left: 0; right: 0; flex-direction: column; }
         #top-player .hand { flex-direction: row; gap: 0; }
-        /* 对家（顶位）手牌紧挨，与左右竖排一致美观 */
-        #top-player .hand .tile { transform: scale(0.8); margin: 0 -10px; }
+        /* 对家（顶位）手牌等比例面积两倍，与己方手牌一致 */
+        #top-player .hand .tile { transform: scale(1.414); margin: 0 -18px; }
         
         #left-player { top: 0; bottom: 0; left: 20px; flex-direction: row; }
         #left-player .hand { flex-direction: column; }
@@ -265,8 +265,8 @@
         }
         
         #left-player .hand .tile, #right-player .hand .tile {
-            transform: scale(0.9);
-            margin: -10px 0; /* Stack effect */
+            transform: scale(1.414);
+            margin: -18px 0;
         }
         
         /* Controls */
