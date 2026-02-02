@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>海克斯麻将</title>
+    <!-- 提前预加载常用牌图，减少摸牌/出牌时先白后图 -->
+    <link rel="preload" href="tiles/man1.png" as="image">
+    <link rel="preload" href="tiles/pin1.png" as="image">
+    <link rel="preload" href="tiles/sou1.png" as="image">
+    <link rel="preload" href="tiles/dong.png" as="image">
+    <link rel="preload" href="tiles/zhong.png" as="image">
     <style>
         :root {
             --bg-color: #006400;
@@ -87,10 +93,10 @@
         /* 他人手牌：面积 0.7 倍，尺寸与间隔不重叠、挨着排 */
         #top-player .hand .tile { width: calc(48px * 0.837); height: calc(66px * 0.837); min-width: calc(48px * 0.837); min-height: calc(66px * 0.837); margin: 0; }
         
-        #left-player { top: 0; bottom: 0; left: 20px; flex-direction: row; }
+        #left-player { top: 0; bottom: 0; left: 0; flex-direction: row; }
         #left-player .hand { flex-direction: column; gap: 4px; }
         
-        #right-player { top: 0; bottom: 0; right: 20px; flex-direction: row-reverse; }
+        #right-player { top: 0; bottom: 0; right: 0; flex-direction: row-reverse; }
         #right-player .hand { flex-direction: column; gap: 4px; }
         
         #bottom-player { bottom: 20px; left: 0; right: 0; flex-direction: column; justify-content: flex-end; }
@@ -344,6 +350,7 @@
             justify-content: center;
             align-items: center;
             overflow: hidden;
+            background: #f0e6d8; /* 牌图加载前占位，避免先白 */
         }
         .tile-content img {
             width: 100%;
@@ -642,6 +649,7 @@
             #deck-info { left: 36px !important; }
             #round-info { left: 36px !important; }
             #room-id-display { right: 36px !important; }
+            #btn-takeover { top: 36px; right: 36px !important; }
         }
 
         /* --- 移动端竖屏时：强制横屏游玩（整页旋转 90° 显示）--- */
@@ -759,6 +767,7 @@
     <div id="deck-info" style="pointer-events:none;">剩余: --</div>
     <div id="round-info" style="pointer-events:none;">第 1 / 16 局</div>
     <div id="room-id-display" style="pointer-events:none; display:none;">房间号: —</div>
+    <button type="button" id="btn-takeover" style="display:none; position:fixed; top:36px; right:24px; z-index:150; font-size:14px; padding:4px 10px; border-radius:6px; background:rgba(0,0,0,0.4); color:#ffd700; border:1px solid rgba(255,255,255,0.3); cursor:pointer;">AI托管</button>
     <button type="button" id="btn-fullscreen" title="全屏" aria-label="全屏">⛶</button>
 </div>
 
@@ -879,7 +888,6 @@
         'prism_new_12': { id: 'prism_new_12', tier: 'prismatic', name: '不动如山', desc: '不碰不杠（门清）胡牌，额外+10分(由系统支付)。' },
         'prism_new_13': { id: 'prism_new_13', tier: 'prismatic', name: '棱彩命运', desc: '从所有彩色海克斯中（不包括棱彩命运）随机选择一个彩色海克斯。' },
         'prism_new_14': { id: 'prism_new_14', tier: 'prismatic', name: '天命眷顾', desc: '每局游戏的前三巡摸牌，你摸到的牌必然是你手中已有的牌。' },
-        'prism_new_15': { id: 'prism_new_15', tier: 'prismatic', name: '大魔法师', desc: '每局游戏第一次轮到你的回合时，主动选择 3 张手牌和场上随机一名玩家交换随机三张手牌，无需另一方确认。' },
         'prism_new_16': { id: 'prism_new_16', tier: 'prismatic', name: '代码干扰', desc: '每次有玩家碰牌后，混淆对手（除你以外）的牌面 UI 持续一回合。' },
     };
 
@@ -995,18 +1003,6 @@
     });
 
     // 监听可用动作 (由服务端扫描后发送，含听牌后杠的 8 秒选择)
-    socket.on('archmageSwapRequest', function(data) {
-        state.archmageSwapMode = true;
-        state.archmageSelectedIndices = [];
-        state.archmageTimeout = data.timeout || 15000;
-        render();
-        var msgEl = document.getElementById('message-area');
-        if (msgEl) {
-            msgEl.style.display = 'block';
-            msgEl.innerHTML = '<div style="color:#ffd700;">【大魔法师】请选择 3 张手牌与随机对手交换（点击手牌选择，选满 3 张后自动发送）</div>';
-        }
-    });
-
     socket.on('availableActions', function(data) {
         // data: { actions: [ {type, data} ], discardedTile, discarderId, timeout }
         state.actionProcessing = false;
@@ -1308,12 +1304,6 @@
         state.currentPlayerDrewThisTurn = !!data.currentPlayerDrewThisTurn;
         state.codeInterferenceActive = !!data.codeInterferenceActive;
         state.confuseMyHand = !!data.confuseMyHand;
-        state.waitingForArchmage = data.waitingForArchmage;
-        // 大魔法师：与服务器同步选牌状态，避免服务端已超时但客户端仍显示选牌导致提交被拒
-        var amWaiting = (data.waitingForArchmage != null && String(data.waitingForArchmage) === String(state.myServerId));
-        state.archmageSwapMode = !!amWaiting;
-        if (!amWaiting) state.archmageSelectedIndices = [];
-        
         if (data.roomName) {
             var roomIdEl = document.getElementById('room-id-display');
             if (roomIdEl) {
@@ -1408,13 +1398,18 @@
         }
         updateTakeoverButton();
 
+        // 胡了之后本局已结束，不再显示胡/过
+        if (data.status === 'ended' || data.status === 'game_over') {
+            hideInteractionButtons();
+        }
+
         // 允许操作 (如果是我的回合，或者有待处理动作)
         const hasPendingAction = data.pendingActions && data.pendingActions[state.myServerId];
         if (state.currentPlayerIndex === state.myServerId || hasPendingAction) {
              state.actionProcessing = false;
         }
 
-        if (hasPendingAction) {
+        if (hasPendingAction && data.status !== 'ended' && data.status !== 'game_over') {
              var myActions = data.pendingActions[state.myServerId];
              state.pendingServerActions = Array.isArray(myActions) ? myActions.slice() : [];
              console.log('Received pending actions from updateState:', state.pendingServerActions);
@@ -1739,12 +1734,21 @@
     }
 
     function updateTakeoverButton() {
-        var btn = document.getElementById('btn-cancel-takeover');
-        if (!btn) return;
-        if (currentRoomName && state.isTakeover && !state.gameOver) {
-            btn.style.display = 'inline-block';
-        } else {
-            btn.style.display = 'none';
+        var cancelBtn = document.getElementById('btn-cancel-takeover');
+        var takeoverBtn = document.getElementById('btn-takeover');
+        if (cancelBtn) {
+            if (currentRoomName && state.isTakeover && !state.gameOver) {
+                cancelBtn.style.display = 'inline-block';
+            } else {
+                cancelBtn.style.display = 'none';
+            }
+        }
+        if (takeoverBtn) {
+            if (currentRoomName && !state.isTakeover && !state.gameOver && state.players && state.players[0]) {
+                takeoverBtn.style.display = 'inline-block';
+            } else {
+                takeoverBtn.style.display = 'none';
+            }
         }
     }
     
@@ -2939,25 +2943,6 @@
         if (state.gameOver) return;
         if (state.actionProcessing) return;
         if (playerIndex !== 0) return;
-        if (state.currentPlayerIndex !== state.myServerId && !state.archmageSwapMode) return;
-        
-        if (state.archmageSwapMode) {
-            var arr = state.archmageSelectedIndices || [];
-            var idx = arr.indexOf(tileIndex);
-            if (idx >= 0) arr.splice(idx, 1);
-            else if (arr.length < 3) arr.push(tileIndex);
-            state.archmageSelectedIndices = arr;
-            render();
-            if (arr.length === 3) {
-                state.archmageSwapMode = false;
-                state.archmageSelectedIndices = [];
-                var msgEl = document.getElementById('message-area');
-                if (msgEl) msgEl.style.display = 'none';
-                socket.emit('action', { roomName: currentRoomName, type: 'archmageSwap', data: { handIndices: arr.slice().sort(function(a,b){ return a-b; }) } });
-            }
-            return;
-        }
-        
         if (state.currentPlayerIndex !== state.myServerId) return;
         
         if (state.resourceRecycleMode) {
@@ -3849,13 +3834,10 @@
                     }
 
                     // 选中状态
-                    if (state.archmageSwapMode && state.archmageSelectedIndices && state.archmageSelectedIndices.indexOf(index) >= 0) {
-                        tileEl.classList.add('selected');
-                    } else if (index === state.selectedTileIndex && !state.isTingMode && !state.archmageSwapMode) {
+                    if (index === state.selectedTileIndex && !state.isTingMode) {
                         tileEl.classList.add('selected');
                     }
                     
-                    if (state.archmageSwapMode) tileEl.style.cursor = 'pointer';
                     tileEl.onclick = () => onTileClick(player.id, index);
                     handEl.appendChild(tileEl);
                 });
@@ -4391,6 +4373,13 @@
         if (!currentRoomName || !state.isTakeover) return;
         socket.emit('action', { roomName: currentRoomName, type: 'cancelTakeover', data: {} });
     };
+    var btnTakeover = document.getElementById('btn-takeover');
+    if (btnTakeover) {
+        btnTakeover.onclick = function () {
+            if (!currentRoomName || state.isTakeover || state.gameOver) return;
+            socket.emit('action', { roomName: currentRoomName, type: 'requestTakeover', data: {} });
+        };
+    }
 
     // 预加载语音列表 (尝试解决某些浏览器第一次获取不到的问题)
     if ('speechSynthesis' in window) {
