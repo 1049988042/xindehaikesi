@@ -449,6 +449,7 @@ function calculateScoring(room, winType, winnerId, loserId) {
          }
 
          if (winType === 'zimo') {
+             let prism4ZimoLogged = false;
              room.players.forEach(p => {
                  if (p.id !== winnerId) {
                      let payment = finalWinnerScore;
@@ -461,16 +462,20 @@ function calculateScoring(room, winType, winnerId, loserId) {
                         payment *= 2;
                     }
                      
-                     // Prism 4: 推倒之王 (未听牌翻倍)
-                     if (winner.hextechs.includes('prism_4') && !p.isTing) {
-                         payment *= 2;
-                     }
-                     
                      // Apply Extras
                      payment += extraPerPerson;
 
-                     // Gold 2: 庄家威严 (Fixed 6 points, overrides others)
+                     // Gold 2: 庄家威严 (庄家自摸闲家付6分)
                      if (isZhuangWeiYan) payment = 6;
+
+                     // Prism 4: 推倒之王 (未听牌者支付翻倍) — 在庄家威严等之后应用，自摸时未听牌者付双倍
+                     if (winner.hextechs.includes('prism_4') && !p.isTing) {
+                         payment *= 2;
+                         if (!prism4ZimoLogged) {
+                             summary.push("【推倒之王】自摸时未听牌者支付翻倍");
+                             prism4ZimoLogged = true;
+                         }
+                     }
 
                      scoreChanges[p.id] -= payment;
                      scoreChanges[winnerId] += payment;
@@ -1077,6 +1082,21 @@ io.on('connection', (socket) => {
             player.isBot = true;
             console.log(`[${roomName}] Player ${player.id} requested AI takeover.`);
             broadcastGameState(roomName);
+            // 若当前轮到此玩家出牌，立即取消 20s 计时并 1s 后托管出牌
+            if (room.state.currentPlayerIndex === player.id && !room.state.turnDiscarded) {
+                if (room.turnTimer) {
+                    clearTimeout(room.turnTimer);
+                    room.turnTimer = null;
+                }
+                const BOT_DISCARD_DELAY_MS = 1000;
+                setTimeout(() => {
+                    const r = rooms[roomName];
+                    if (!r || r.state.status !== 'playing' || r.state.currentPlayerIndex !== player.id || r.state.turnDiscarded) return;
+                    const tileIndex = player.hand.length - 1;
+                    const tile = player.hand[tileIndex];
+                    handleDiscard(roomName, null, tile, tileIndex, false);
+                }, BOT_DISCARD_DELAY_MS);
+            }
             return;
         }
 
@@ -1623,8 +1643,8 @@ io.on('connection', (socket) => {
              }
 
              if (nextPlayer.isBot) {
-                 // AI 托管：2 秒后自动打出最后一张牌（不碰不胡，只出牌）
-                 const delay = 2000;
+                 // AI 托管：1 秒后自动打出最后一张牌（不碰不胡，只出牌）
+                 const delay = 1000;
                  console.log(`[${roomName}] Bot ${nextPlayer.id} auto discarding in ${delay / 1000}s.`);
                  setTimeout(() => {
                      const currentRoom = rooms[roomName];

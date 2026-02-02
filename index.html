@@ -358,6 +358,11 @@
             object-fit: contain;
             display: block;
             background: #f0e6d8;
+            opacity: 0;
+            transition: opacity 0.15s ease-out;
+        }
+        .tile-content img.tile-img-loaded {
+            opacity: 1;
         }
         
         .color-red { color: #d00; background-color: #d00; border-color: #d00; }
@@ -4045,6 +4050,19 @@
 
         // Ensure hextech icons are visible
         renderPlayerHextechs();
+        // 牌图加载后淡入，避免先白
+        markTileImagesLoaded();
+    }
+
+    function markTileImagesLoaded() {
+        document.querySelectorAll('.tile-content img').forEach(function(img) {
+            if (img.classList.contains('tile-img-loaded')) return;
+            if (img.complete) {
+                img.classList.add('tile-img-loaded');
+            } else {
+                img.addEventListener('load', function() { this.classList.add('tile-img-loaded'); });
+            }
+        });
     }
 
     // --- 界面渲染 ---
