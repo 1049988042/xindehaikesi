@@ -6,10 +6,39 @@
     <title>海克斯麻将</title>
     <!-- 提前预加载常用牌图，减少摸牌/出牌时先白后图 -->
     <link rel="preload" href="tiles/man1.png" as="image">
+    <link rel="preload" href="tiles/man2.png" as="image">
+    <link rel="preload" href="tiles/man3.png" as="image">
+    <link rel="preload" href="tiles/man4.png" as="image">
+    <link rel="preload" href="tiles/man5.png" as="image">
+    <link rel="preload" href="tiles/man6.png" as="image">
+    <link rel="preload" href="tiles/man7.png" as="image">
+    <link rel="preload" href="tiles/man8.png" as="image">
+    <link rel="preload" href="tiles/man9.png" as="image">
     <link rel="preload" href="tiles/pin1.png" as="image">
+    <link rel="preload" href="tiles/pin2.png" as="image">
+    <link rel="preload" href="tiles/pin3.png" as="image">
+    <link rel="preload" href="tiles/pin4.png" as="image">
+    <link rel="preload" href="tiles/pin5.png" as="image">
+    <link rel="preload" href="tiles/pin6.png" as="image">
+    <link rel="preload" href="tiles/pin7.png" as="image">
+    <link rel="preload" href="tiles/pin8.png" as="image">
+    <link rel="preload" href="tiles/pin9.png" as="image">
     <link rel="preload" href="tiles/sou1.png" as="image">
+    <link rel="preload" href="tiles/sou2.png" as="image">
+    <link rel="preload" href="tiles/sou3.png" as="image">
+    <link rel="preload" href="tiles/sou4.png" as="image">
+    <link rel="preload" href="tiles/sou5.png" as="image">
+    <link rel="preload" href="tiles/sou6.png" as="image">
+    <link rel="preload" href="tiles/sou7.png" as="image">
+    <link rel="preload" href="tiles/sou8.png" as="image">
+    <link rel="preload" href="tiles/sou9.png" as="image">
     <link rel="preload" href="tiles/dong.png" as="image">
+    <link rel="preload" href="tiles/nan.png" as="image">
+    <link rel="preload" href="tiles/xi.png" as="image">
+    <link rel="preload" href="tiles/bei.png" as="image">
     <link rel="preload" href="tiles/zhong.png" as="image">
+    <link rel="preload" href="tiles/fa.png" as="image">
+    <link rel="preload" href="tiles/bai.png" as="image">
     <style>
         :root {
             --bg-color: #006400;
@@ -495,7 +524,6 @@
             border: 2px solid #fff;
             box-shadow: 0 0 8px rgba(0,0,0,0.5);
         }
-        .mini-hextech.silver { background: linear-gradient(135deg, #e0e0e0, #7f8c8d); }
         .mini-hextech.gold { background: linear-gradient(135deg, #f1c40f, #d35400); }
         .mini-hextech.prismatic { background: linear-gradient(135deg, #8e44ad, #c0392b, #f39c12); }
 
@@ -836,25 +864,9 @@
     const DRAGONS = ['中', '发财', '白板'];
     
     // --- 海克斯数据 (Hextech Data) ---
-    const HEXTECH_TIERS = { SILVER: 'silver', GOLD: 'gold', PRISMATIC: 'prismatic' };
+    const HEXTECH_TIERS = { GOLD: 'gold', PRISMATIC: 'prismatic' };
     const HEXTECH_DATA = {
-        // Silver
-        'silver_1': { id: 'silver_1', tier: 'silver', name: '杠头小利', desc: '每次明杠（点杠）时，额外从点杠者处获得1分。' },
-        'silver_3': { id: 'silver_3', tier: 'silver', name: '摸牌入门', desc: '每局轮到自己的第一次出牌时，可选择一张手牌与牌堆中的随机一张牌交换。' },
-        'silver_4': { id: 'silver_4', tier: 'silver', name: '边张好手', desc: '自摸胡3、7时，每家多付1分。' },
-        'silver_6': { id: 'silver_6', tier: 'silver', name: '补杠达人', desc: '补杠时每家多付1分。' },
-        'silver_new_1': { id: 'silver_new_1', tier: 'silver', name: '省钱专家', desc: '点炮时少支付 1 分。' },
-        'silver_new_2': { id: 'silver_new_2', tier: 'silver', name: '杠上添花', desc: '结算时若本局有杠，额外得 2 分(由系统支付)。' },
-        'silver_new_3': { id: 'silver_new_3', tier: 'silver', name: '报听补贴', desc: '报听后若流局，系统补偿 3 分。' },
-        'silver_new_4': { id: 'silver_new_4', tier: 'silver', name: '红包开局', desc: '选定后立即获得 10 分(由系统支付)。' },
-        'silver_new_5': { id: 'silver_new_5', tier: 'silver', name: '早起鸟儿', desc: '前 10 巡胡牌额外加 4 分(由系统支付)。' },
-        'silver_new_6': { id: 'silver_new_6', tier: 'silver', name: '底力', desc: '分数全场最低时，胡牌时总得分 +5(由系统支付)。' },
-        'silver_new_7': { id: 'silver_new_7', tier: 'silver', name: '收集癖', desc: '胡牌时手牌中有 2 对刻子，额外加 2 分(由系统支付)。' },
-        'silver_new_8': { id: 'silver_new_8', tier: 'silver', name: '闲家之光', desc: '作为闲家胡牌时，多收每家 1 分。' },
-        'silver_new_9': { id: 'silver_new_9', tier: 'silver', name: '稳扎稳打', desc: '每连续 3 局不点炮，获得 4 分奖励(由系统支付)。' },
-        'silver_new_10': { id: 'silver_new_10', tier: 'silver', name: '环保卫士', desc: '胡牌没有风牌时，得分 +2(由系统支付)。' },
-        'silver_new_11': { id: 'silver_new_11', tier: 'silver', name: '清仓处理', desc: '手牌少于等于 5 张牌时（多碰/杠）胡牌，加 3 分(由系统支付)。' },
-        'silver_new_12': { id: 'silver_new_12', tier: 'silver', name: '礼尚往来', desc: '出牌被别人杠后，对方需立即支付你 1 分补偿。' },
+        // Silver (Removed)
 
         // Gold
         'gold_1': { id: 'gold_1', tier: 'gold', name: '疯狂杠精', desc: '所有杠分（明/暗/补）翻倍。' },
@@ -873,9 +885,12 @@
         'gold_new_7': { id: 'gold_new_7', tier: 'gold', name: '社交恐怖', desc: '每碰一次牌，本回合胡牌基础分 +2(由系统支付)。' },
         'gold_new_8': { id: 'gold_new_8', tier: 'gold', name: '暗箱操作', desc: '永久看到三名对手手牌的前 3 张。' },
         'gold_new_9': { id: 'gold_new_9', tier: 'gold', name: '资本家', desc: '你每拥有的 10 个积分，胡牌分额外 +1(由系统支付)。' },
+        'gold_new_10': { id: 'gold_new_10', tier: 'gold', name: '红包开局', desc: '选定后立即获得 20 分(由系统支付)。' },
+        'gold_new_11': { id: 'gold_new_11', tier: 'gold', name: '底力', desc: '分数全场最低时，胡牌时总得分 +5(由系统支付)。' },
+        'gold_new_12': { id: 'gold_new_12', tier: 'gold', name: '稳扎稳打', desc: '每连续 3 局不点炮，获得 5 分奖励(由系统支付)。' },
 
         // Prismatic
-        'prism_3': { id: 'prism_3', tier: 'prismatic', name: '暗箭难防', desc: '手中刻子结算时算暗杠分（不公开）。' },
+        'prism_3': { id: 'prism_3', tier: 'prismatic', name: '暗箭难防', desc: '手中暗刻结算时算暗杠分（不公开）。' },
         'prism_4': { id: 'prism_4', tier: 'prismatic', name: '推倒之王', desc: '胡牌时，未听牌者支付翻倍。' },
         'prism_6': { id: 'prism_6', tier: 'prismatic', name: '庄家杀手', desc: '闲家胡庄家（点炮/自摸），庄家付3倍。' },
         'prism_9': { id: 'prism_9', tier: 'prismatic', name: '十三幺契约', desc: '第一次出牌后，只要手牌没有对子（允许顺子），每巡+1分(由系统支付)。一旦出牌后手牌有对子，契约终止。' },
@@ -883,15 +898,15 @@
         'prism_new_2': { id: 'prism_new_2', tier: 'prismatic', name: '天命所归', desc: '开局指定一张随机牌为“万能牌”（仅手牌有效）。' },
         'prism_new_3': { id: 'prism_new_3', tier: 'prismatic', name: '终结者', desc: '胡牌且有杠，胡牌得分 ×2。' },
         'prism_new_4': { id: 'prism_new_4', tier: 'prismatic', name: '镜像世界', desc: '你可以看到所有人的手牌。' },
-        'prism_new_5': { id: 'prism_new_5', tier: 'prismatic', name: '孤注一掷', desc: '报听后无法摸牌，只能等别人点炮，胡牌分 ×5。' },
+        'prism_new_5': { id: 'prism_new_5', tier: 'prismatic', name: '孤注一掷', desc: '报听后无法摸牌，只能等别人点炮，胡牌分 ×3。' },
         'prism_new_6': { id: 'prism_new_6', tier: 'prismatic', name: '老当益壮', desc: '在第 11 局以后胡牌，胡牌分 ×5。' },
         'prism_new_7': { id: 'prism_new_7', tier: 'prismatic', name: '推倒一切', desc: '胡牌时若无刻子（全顺子），额外+10分(由系统支付)。' },
         'prism_new_8': { id: 'prism_new_8', tier: 'prismatic', name: '绝户计', desc: '你打出的牌，别人不能碰、不能杠。' },
         'prism_new_9': { id: 'prism_new_9', tier: 'prismatic', name: '铁壁', desc: '只要你没听牌，你打出的任何牌别人都不能胡。' },
         'prism_new_10': { id: 'prism_new_10', tier: 'prismatic', name: '轮回', desc: '本局点炮输掉的分数，若下局胡牌则全额返还(由系统支付)。' },
-        'prism_new_11': { id: 'prism_new_11', tier: 'prismatic', name: '底牌反击', desc: '牌墙不足 10 张时胡牌，额外+10分(由系统支付)。' },
+        'prism_new_11': { id: 'prism_new_11', tier: 'prismatic', name: '底牌反击', desc: '牌墙不足 20 张时胡牌，额外+10分(由系统支付)。' },
         'prism_new_12': { id: 'prism_new_12', tier: 'prismatic', name: '不动如山', desc: '不碰不杠（门清）胡牌，额外+10分(由系统支付)。' },
-        'prism_new_13': { id: 'prism_new_13', tier: 'prismatic', name: '棱彩命运', desc: '从所有彩色海克斯中（不包括棱彩命运）随机选择一个彩色海克斯。' },
+        'prism_new_13': { id: 'prism_new_13', tier: 'prismatic', name: '棱彩命运', desc: '从所有彩色海克斯中随机选择一个彩色海克斯（不包括自己）再加15分。' },
         'prism_new_14': { id: 'prism_new_14', tier: 'prismatic', name: '天命眷顾', desc: '每局游戏的前三巡摸牌，你摸到的牌必然是你手中已有的牌。' },
         'prism_new_16': { id: 'prism_new_16', tier: 'prismatic', name: '代码干扰', desc: '每次有玩家碰牌后，混淆对手（除你以外）的牌面 UI 持续一回合。' },
     };
@@ -1365,16 +1380,17 @@
             
             // Sync local player flags
             const human = state.players[0];
-            human.silver3Used = !!data.self.silver3Used;
             human.goldNew5Used = !!data.self.goldNew5Used;
             state.isTakeover = !!data.self.isTakeover;
             
-            // Check for Silver 3 (摸牌入门)：每局轮到自己第一次出牌时（我的回合且手牌14张）触发
+            // Check for Silver 3 (摸牌入门) - Removed
+            /*
             const hasSilver3 = pHasHex(state.players[0], 'silver_3');
             const isMyFirstDiscard = (state.currentPlayerIndex === state.myServerId) && (newHand.length === 14);
             if (hasSilver3 && !human.silver3Used && !state.swapMode && isMyFirstDiscard) {
                 showSilver3UI(human);
             }
+            */
 
             // 摸牌/杠后摸牌保持在最右：仅当 14 张且轮到我时把最后一张单独排；13 张时整手排序；14 张非我回合不排序，保留服务端顺序
             if (newHand.length % 3 === 2) {
@@ -1956,13 +1972,7 @@
                 }
             });
             
-            // Silver new 3: 报听补贴 (报听后若流局，系统补偿 3 分)
-            state.players.forEach(p => {
-                if (playerHasHextechId(p, 'silver_new_3') && p.isTing) {
-                    scoreChanges[p.id] += 3;
-                    summary.push(`${p.name} 触发【报听补贴】，系统补偿 3 分`);
-                }
-            });
+
         }
 
         // 2. 结算胡牌分
@@ -2100,79 +2110,21 @@
                 summary.push("【不动如山】门清，额外+10分");
             }
             
-            // Silver new 2: 杠上添花 (结算时若本局有杠，额外得 2 分)
-            // 只要本局有杠分记录，或者自己有杠
-            if (playerHasHextechId(winner, 'silver_new_2')) {
-                // Check if winner has gangs
-                if (winner.gang.length > 0) {
-                     extraWinScore += 2;
-                     summary.push("【杠上添花】额外+2分");
-                }
-            }
+            // Silver new 2: 杠上添花 (Removed)
 
-            // Silver new 5: 早起鸟儿 (前 10 巡胡牌额外加 4 分)
-            if (playerHasHextechId(winner, 'silver_new_5') && state.turnCount <= 10) {
-                extraWinScore += 4;
-                summary.push("【早起鸟儿】额外+4分");
-            }
+            // Silver new 5: 早起鸟儿 (Removed)
 
-            // Silver new 6: 底力 (分数全场最低时，胡牌时总得分 +5)
+            // Silver new 6: 底力 (Removed)
+            // Note: gold_new_11 has similar logic (lowest score +5)
             const minScore = Math.min(...state.players.map(p => p.score));
-            if (playerHasHextechId(winner, 'silver_new_6') && winner.score === minScore) {
-                extraWinScore += 5;
-                summary.push("【底力】额外+5分");
-            }
 
-            // Silver new 7: 收集癖 (胡牌时手牌中有 2 对刻子，额外加 2 分)
-            // Includes Peng, Gang, and concealed triplets in hand.
-            if (playerHasHextechId(winner, 'silver_new_7')) {
-                let tripletCount = winner.peng.length + winner.gang.length;
-                // Check concealed triplets
-                const handCounts = {};
-                winner.hand.forEach(t => handCounts[t] = (handCounts[t] || 0) + 1);
-                tripletCount += Object.values(handCounts).filter(c => c >= 3).length;
-                
-                if (tripletCount >= 2) {
-                    extraWinScore += 2;
-                    summary.push("【收集癖】额外+2分");
-                }
-            }
+            // Silver new 7: 收集癖 (Removed)
 
-            // Silver new 8: 闲家之光 (作为闲家胡牌时，多收每家 1 分) -> Total +3
-            if (playerHasHextechId(winner, 'silver_new_8') && !isWinnerDealer) {
-                // Technically "receive 1 from each". So +3 total.
-                // We add to extraWinScore. This adds to total payment received.
-                // Wait, extraWinScore is added to payment from EACH loser? 
-                // Let's check loop below: payment += extraWinScore.
-                // If 3 losers, extraWinScore=1 means +3 total. 
-                // If 1 loser (dianpao), extraWinScore=1 means +1 total.
-                // "多收每家 1 分". 
-                // If Zimo: 3 losers. +1 per loser = +3 total. Correct.
-                // If Dianpao: 1 loser. +1 from loser = +1 total. 
-                // Usually "多收每家" in dianpao context might mean "collect extra from that guy".
-                // Or maybe only valid in Zimo? Or "多收 1 分" (from payer).
-                // Let's assume +1 per payer.
-                extraWinScore += 1;
-                summary.push("【闲家之光】每家多收1分");
-            }
+            // Silver new 8: 闲家之光 (Removed)
 
-            // Silver new 10: 环保卫士 (胡牌没有风牌时，得分 +2)
-            if (playerHasHextechId(winner, 'silver_new_10')) {
-                const allTiles = [...winner.hand, ...winner.peng, ...winner.gang];
-                const winds = ['东', '南', '西', '北'];
-                if (!allTiles.some(t => winds.some(w => t.includes(w)))) {
-                    extraWinScore += 2;
-                    summary.push("【环保卫士】额外+2分");
-                }
-            }
+            // Silver new 10: 环保卫士 (Removed)
 
-            // Silver new 11: 清仓处理 (手牌少于等于 5 张牌时（多碰/杠）胡牌，加 3 分)
-            if (playerHasHextechId(winner, 'silver_new_11')) {
-                if (winner.hand.length <= 5) {
-                    extraWinScore += 3;
-                    summary.push("【清仓处理】额外+3分");
-                }
-            }
+            // Silver new 11: 清仓处理 (Removed)
 
             // Gold 5: 连庄霸主 (连庄>=2, +3 score)
             // Note: dealerStreak updated above. If winner is dealer, check streak.
@@ -2212,17 +2164,7 @@
                     summary.push(`${loser.name} 触发【轮回】记录损失，下局胡牌可返还`);
                 }
 
-                // Silver new 1: 省钱专家 (点炮时少支付 1 分)
-                if (playerHasHextechId(loser, 'silver_new_1')) {
-                    finalScore = Math.max(0, finalScore - 1);
-                    summary.push(`${loser.name} 触发【省钱专家】，少支付 1 分`);
-                }
 
-                // Silver new 9: 稳扎稳打 (点炮重置)
-                if (playerHasHextechId(loser, 'silver_new_9')) {
-                    loser.consecutiveNoDealIn = 0;
-                    summary.push(`${loser.name} 点炮，【稳扎稳打】计数重置`);
-                }
                 
                 // Gold 8: 精准打击 - 点炮给庄家只需支付1分
                 if (isWinnerDealer && playerHasHextechId(loser, 'gold_8')) {
@@ -2259,14 +2201,7 @@
                 // Prism 1: 杠上开花·极 (4->8, Dealer 16)
                 // Removed
                 
-                // Silver 4: 边张好手 (胡3/7自摸，每家+1)
-                // Check if winning tile is 3 or 7
-                const winningTile = winner.hand[winner.hand.length-1]; // Last tile is winning tile
-                if (['三','七'].some(x => winningTile.startsWith(x)) && playerHasHextechId(winner, 'silver_4')) {
-                    // This is per player +1. So we can add to baseScore? 
-                    // No, baseScore is multiplied. This is "extra +1". 
-                    // Let's handle it in loop.
-                }
+
 
                 // Gold 2: 庄家威严 (Dealer Zimo -> Others pay 6)
                 // If dealer zimo, baseScore usually 2. Multiplier 2 -> 4. 
@@ -2302,7 +2237,7 @@
                             // Prism 6: 庄家杀手 (你是闲家，自摸，庄家付3x)
                             // winner != dealer. p == dealer.
                             if (!isWinnerDealer && p.id === dealerId && playerHasHextechId(winner, 'prism_6')) {
-                                multiplier = 3; // 3x
+                                multiplier = 4; // 3x
                             }
                             
                             payment = baseScore * multiplier;
@@ -2313,11 +2248,6 @@
                         
                         // Apply Global Multiplier
                         payment = Math.floor(payment * winMultiplier);
-
-                        // Silver 4
-                        if (['三','七'].some(x => winningTile.startsWith(x)) && playerHasHextechId(winner, 'silver_4')) {
-                            payment += 1;
-                        }
                         
                         // Gold 6
                         if (isLastPlace) {
@@ -2344,24 +2274,6 @@
         }
 
         // --- Post-Calculation Hextech Effects ---
-        // Silver new 9: 稳扎稳打 (每连续 3 局不点炮，获得 4 分奖励)
-        state.players.forEach(p => {
-            if (playerHasHextechId(p, 'silver_new_9')) {
-                // If I was the loser in dianpao, I dealt in.
-                const dealtIn = (winType === 'dianpao' && loserId === p.id);
-                
-                if (!dealtIn) {
-                    p.consecutiveNoDealIn = (p.consecutiveNoDealIn || 0) + 1;
-                    // summary.push(`${p.name} 本局未点炮，稳扎稳打计数: ${p.consecutiveNoDealIn}`); // Debug
-                    
-                    if (p.consecutiveNoDealIn >= 3) {
-                        scoreChanges[p.id] += 4;
-                        summary.push(`${p.name} 触发【稳扎稳打】，连续3局未点炮，奖励 4 分！`);
-                        p.consecutiveNoDealIn = 0; // Reset
-                    }
-                }
-            }
-        });
 
         // 3. 更新总分 & 状态更新
         state.players.forEach(p => {
@@ -2443,7 +2355,7 @@
                 card.onclick = () => selectHextech(h.id);
                 
                 let iconChar = '?';
-                if (h.tier === 'silver') iconChar = 'S';
+                // if (h.tier === 'silver') iconChar = 'S'; // Removed
                 if (h.tier === 'gold') iconChar = 'G';
                 if (h.tier === 'prismatic') iconChar = 'P';
 
@@ -2528,26 +2440,7 @@
         // Server will send updated state via 'updateState' event.
     }
     
-    function showSilver3UI(player) {
-        speak('请选择一张手牌进行交换');
-        const msgEl = document.getElementById('message-area');
-        msgEl.innerHTML = `
-            <h3 style="color:#C0C0C0">【摸排入门】</h3>
-            <p>请点击一张手牌与牌堆中的随机一张牌交换，或点击跳过。</p>
-            <button id="btn-skip-swap" class="action-btn" style="background:#888;">跳过</button>
-        `;
-        msgEl.style.display = 'block';
-        
-        state.swapMode = true;
-        document.getElementById('btn-skip-swap').onclick = () => {
-            state.swapMode = false;
-            player.silver3Used = true;
-            msgEl.style.display = 'none';
-            startGameFlow();
-        };
-        
-        render(); // Re-render to show/enable card clicking for swap
-    }
+    // function showSilver3UI(player) { ... } // Removed
 
     function startGameFlow() {
          // Deprecated: Game flow is controlled by server 'updateState' events.
@@ -2571,7 +2464,7 @@
                     // Show a simple modal or reuse message area
                     let color = '#ffd700'; // Default Gold
                     let tierName = '金色';
-                    if (h.tier === 'silver') { color = '#e0e0e0'; tierName = '银色'; }
+                    // if (h.tier === 'silver') { color = '#e0e0e0'; tierName = '银色'; } // Removed
                     if (h.tier === 'prismatic') { color = '#00ffff'; tierName = '彩色'; }
 
                     const msgEl = document.getElementById('message-area');
@@ -2972,18 +2865,7 @@
             return;
         }
 
-        // Silver 3: 摸排入门 Swap Logic
-        if (state.swapMode) {
-             const tileToSwap = player.hand[tileIndex];
-             socket.emit('action', {
-                 roomName: currentRoomName,
-                 type: 'swap',
-                 data: { tile: tileToSwap }
-             });
-             state.swapMode = false;
-             document.getElementById('message-area').style.display = 'none';
-             return;
-        }
+
 
         // 听牌模式下的点击处理
         if (state.isTingMode) {
@@ -3212,10 +3094,6 @@
         speak('杠'); // 加杠通常也喊杠
         
         let score = 1;
-        // Silver 6: 补杠达人 (补杠时每家额外支付1分)
-        if (playerHasHextechId(player, 'silver_6')) {
-            score += 1;
-        }
         // Gold 1: 疯狂杠精 (所有杠分翻倍)
         if (playerHasHextechId(player, 'gold_1')) {
             score *= 2;
@@ -4205,7 +4083,6 @@
             p.peng = [];
             p.gang = [];
             p.isTing = false;
-            p.silver3Used = false; // Reset Silver 3 usage
             p.goldNew5Used = false; // Reset Gold New 5 usage (Resource Recycle)
             p.prism9Terminated = false; // Reset Prism 9 contract
             p.anJianUsedTiles = []; // Reset Prism 3 used tiles

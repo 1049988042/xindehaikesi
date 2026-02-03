@@ -25,13 +25,9 @@ const DRAGONS = ['中', '发财', '白板'];
 // 简化的海克斯数据 (仅用于生成选项，完整描述可由客户端渲染或服务端下发)
 // 为了确保一致性，服务端只保留 ID，具体描述和 tier 由前端根据 ID 查找
 const HEXTECH_IDS = [
-    'silver_1', 'silver_3', 'silver_4', 'silver_6',
-    'silver_new_1', 'silver_new_2', 'silver_new_3', 'silver_new_4',
-    'silver_new_5', 'silver_new_6', 'silver_new_7', 'silver_new_8',
-    'silver_new_9', 'silver_new_10', 'silver_new_11', 'silver_new_12',
     'gold_1', 'gold_2', 'gold_5', 'gold_6', 'gold_7', 'gold_8', 'gold_10',
     'gold_new_1', 'gold_new_2', 'gold_new_3', 'gold_new_4', 'gold_new_5',
-    'gold_new_6', 'gold_new_7', 'gold_new_8', 'gold_new_9',
+    'gold_new_6', 'gold_new_7', 'gold_new_8', 'gold_new_9', 'gold_new_10', 'gold_new_11', 'gold_new_12',
     'prism_3', 'prism_4', 'prism_6', 'prism_9',
     'prism_new_1', 'prism_new_2', 'prism_new_3', 'prism_new_4', 'prism_new_5',
     'prism_new_6', 'prism_new_7', 'prism_new_8', 'prism_new_9', 'prism_new_10',
@@ -42,9 +38,8 @@ const HEXTECH_IDS = [
 const PRISM_FATE_ID = 'prism_new_13';
 const PRISMATIC_OTHER = HEXTECH_IDS.filter(id => id.startsWith('prism') && id !== PRISM_FATE_ID);
 
-const HEX_TIERS = ['silver', 'gold', 'prismatic'];
+const HEX_TIERS = ['gold', 'prismatic'];
 const HEXTECH_POOLS = {
-    silver: HEXTECH_IDS.filter(id => id.startsWith('silver')),
     gold: HEXTECH_IDS.filter(id => id.startsWith('gold')),
     prismatic: HEXTECH_IDS.filter(id => id.startsWith('prism'))
 };
@@ -95,7 +90,7 @@ function shuffle(deck) {
     return deck;
 }
 
-// 辅助函数：随机选择一个海克斯等级（银/金/彩），三个等级概率相同
+// 辅助函数：随机选择一个海克斯等级（金/彩），两个等级概率相同
 function getRandomHexTier() {
     const idx = Math.floor(Math.random() * HEX_TIERS.length);
     return HEX_TIERS[idx];
@@ -377,7 +372,7 @@ function calculateScoring(room, winType, winnerId, loserId) {
         const isWinnerDealer = (winnerId === room.state.dealerId);
         
         let extraWinScore = 0;
-        let winMultiplier = 1;
+        let winMultiplier = 0; // 改为0，方便直接累加海克斯倍率
 
         // 基础倍率：庄家胡牌/闲家胡庄家通常有加成
         let dealerMultiplier = isWinnerDealer ? 2 : 1;
@@ -390,7 +385,7 @@ function calculateScoring(room, winType, winnerId, loserId) {
         
         // Gold New 6: 快节奏 (前 12 巡翻倍)
         if (winner.hextechs.includes('gold_new_6') && room.state.turnCount <= 12) {
-            winMultiplier *= 2;
+            winMultiplier += 2;
             summary.push("【快节奏】速攻，得分翻倍");
         }
 
@@ -403,29 +398,32 @@ function calculateScoring(room, winType, winnerId, loserId) {
 
         // Prism New 3: 终结者 (有杠翻倍)
         if (winner.hextechs.includes('prism_new_3') && winner.gang.length > 0) {
-            winMultiplier *= 2;
+            winMultiplier += 2;
             summary.push("【终结者】胡牌且有杠，得分×2");
         }
 
-        // Prism New 5: 孤注一掷 (报听后胡牌×5)
+        // Prism New 5: 孤注一掷 (报听后胡牌×3)
         if (winner.hextechs.includes('prism_new_5') && winner.isTing) {
-            winMultiplier *= 5;
-            summary.push("【孤注一掷】得分×5");
+            winMultiplier += 3;
+            summary.push("【孤注一掷】得分×3");
         }
 
         // Prism New 6: 老当益壮 (第11局以后×5)
         if (winner.hextechs.includes('prism_new_6') && room.state.roundNum > 11) {
-            winMultiplier *= 5;
+            winMultiplier += 5;
             summary.push("【老当益壮】后期爆发，得分×5");
         }
 
         // Gold 6: 绝地翻盘 (总分最后一名时，自摸翻倍)
         const minS = Math.min(...room.players.map(p => p.score));
         if (winType === 'zimo' && winner.hextechs.includes('gold_6') && winner.score === minS) {
-            winMultiplier *= 2;
+            winMultiplier += 2;
             summary.push("【绝地翻盘】绝境反击，得分翻倍");
         }
  
+        // 如果没有触发任何倍率海克斯，保持基础 1 倍
+        if (winMultiplier === 0) winMultiplier = 1;
+
          // 计算总分
          const baseScore = 2;
          let finalWinnerScore = (baseScore + extraWinScore) * winMultiplier * dealerMultiplier;
@@ -433,21 +431,6 @@ function calculateScoring(room, winType, winnerId, loserId) {
          // --- 额外支付计算 ---
          let extraPerPerson = 0;
          
-         // Silver 4: 边张好手 (自摸胡3、7时，每家多付1分)
-         if (winType === 'zimo' && winner.hextechs.includes('silver_4')) {
-             const winTile = winner.hand[winner.hand.length-1];
-             if (winTile && (winTile.startsWith('三') || winTile.startsWith('七'))) {
-                 extraPerPerson += 1;
-                 summary.push("【边张好手】胡 3/7，每家多付 1 分");
-             }
-         }
-
-         // Silver New 8: 闲家之光 (作为闲家胡牌时，多收每家 1 分)
-         if (winnerId !== room.state.dealerId && winner.hextechs.includes('silver_new_8')) {
-             extraPerPerson += 1;
-             summary.push("【闲家之光】闲家胡牌，每家多付 1 分");
-         }
-
          if (winType === 'zimo') {
              let prism4ZimoLogged = false;
              room.players.forEach(p => {
@@ -456,7 +439,7 @@ function calculateScoring(room, winType, winnerId, loserId) {
                      
                      // Prism 6: 庄家杀手
                     if (winnerId !== room.state.dealerId && p.id === room.state.dealerId && winner.hextechs.includes('prism_6')) {
-                        payment *= 3;
+                        payment *= 4;
                     } else if (p.id === room.state.dealerId) {
                         // 庄家通常需支付双倍 (除非是庄家杀手覆盖)
                         payment *= 2;
@@ -504,11 +487,6 @@ function calculateScoring(room, winType, winnerId, loserId) {
                  summary.push("【精准打击】点炮给庄家仅支付 1 分");
              }
              
-             // Silver New 1: 省钱专家
-             if (loser.hextechs.includes('silver_new_1')) {
-                 payment = Math.max(1, payment - 1);
-             }
-
              scoreChanges[loserId] -= payment;
              scoreChanges[winnerId] += payment;
 
@@ -554,7 +532,7 @@ function calculateScoring(room, winType, winnerId, loserId) {
                  }
              }
              
-             // Silver New 9: 稳扎稳打 (连续3局不点炮+4) - 修复 scoreChanges 同步问题
+             // Gold New 12: 稳扎稳打 (连续3局不点炮+5)
              // 注意：consecutiveNonDianpao 逻辑在下方循环中处理，这里仅处理结算同步
              // 为了避免双重计算，我们将下方的逻辑移到这里，或者在这里统一处理
          });
@@ -566,50 +544,11 @@ function calculateScoring(room, winType, winnerId, loserId) {
              summary.push(`【社交恐怖】${winner.name} 碰牌后胡牌，额外+${pengBonus} 分`);
          }
 
-         // Silver new 2: 杠上添花 (仅胡牌者：本局有杠且胡牌才加分)
-         if (winner.hextechs.includes('silver_new_2') && winner.gang.length > 0) {
-             scoreChanges[winnerId] += 2;
-             summary.push(`【杠上添花】${winner.name} 本局有杠且胡牌，额外+2 分`);
-         }
-
-         // Silver new 5: 早起鸟儿 (仅胡牌者，前 10 巡胡牌额外加 4 分)
-         if (winner.hextechs.includes('silver_new_5') && room.state.turnCount <= 10) {
-            scoreChanges[winnerId] += 4;
-            summary.push("【早起鸟儿】系统额外支付 4 分");
-         }
-
-         // Silver new 6: 底力 (仅胡牌者，分数最低+5)
+         // Gold New 11: 底力 (仅胡牌者，分数最低+5)
          const minScore = Math.min(...room.players.map(p => p.score));
-         if (winner.hextechs.includes('silver_new_6') && winner.score === minScore) {
+         if (winner.hextechs.includes('gold_new_11') && winner.score === minScore) {
              scoreChanges[winnerId] += 5;
              summary.push("【底力】系统额外支付 5 分");
-         }
-
-         // Silver new 7: 收集癖 (仅胡牌者，2对刻子+2)
-         if (winner.hextechs.includes('silver_new_7')) {
-             let tripletCount = winner.peng.length + winner.gang.length;
-             const counts = {};
-             winner.hand.forEach(t => counts[t] = (counts[t]||0)+1);
-             tripletCount += Object.values(counts).filter(c => c >= 3).length;
-             if (tripletCount >= 2) {
-                 scoreChanges[winnerId] += 2;
-                 summary.push("【收集癖】系统额外支付 2 分");
-             }
-         }
-
-         // Silver New 10: 环保卫士 (仅胡牌者，无风牌+2)
-         if (winner.hextechs.includes('silver_new_10')) {
-             const hasWinds = [...winner.hand, ...winner.peng, ...winner.gang].some(t => WINDS.includes(t));
-             if (!hasWinds) {
-                 scoreChanges[winnerId] += 2;
-                 summary.push("【环保卫士】系统额外支付 2 分");
-             }
-         }
-
-         // Silver New 11: 清仓处理 (仅胡牌者，手牌<=5张+3)
-         if (winner.hextechs.includes('silver_new_11') && winner.hand.length <= 5) {
-             scoreChanges[winnerId] += 3;
-             summary.push("【清仓处理】系统额外支付 3 分");
          }
 
          // Gold 5: 连庄霸主 (连庄>=2胡牌+3)
@@ -658,8 +597,8 @@ function calculateScoring(room, winType, winnerId, loserId) {
              }
          }
 
-         // Prism New 11: 底牌反击 (牌墙<10张+10)
-         if (winner.hextechs.includes('prism_new_11') && room.state.deck.length < 10) {
+         // Prism New 11: 底牌反击 (牌墙<20张+10)
+         if (winner.hextechs.includes('prism_new_11') && room.state.deck.length < 20) {
              scoreChanges[winnerId] += 10;
              summary.push("【底牌反击】系统额外支付 10 分");
          }
@@ -706,14 +645,6 @@ function calculateScoring(room, winType, winnerId, loserId) {
                  });
              }
          });
-
-         // Silver new 3: 报听补贴 (报听后若流局，系统补偿 3 分)
-         room.players.forEach(p => {
-             if (p.hextechs.includes('silver_new_3') && p.isTing) {
-                 scoreChanges[p.id] += 3;
-                 summary.push(`${p.name} 触发【报听补贴】，系统补偿 3 分`);
-             }
-         });
      }
 
     // 应用积分变动 - 移除此处直接应用，统一由 handleRoundEnd 处理，防止双重计算
@@ -721,16 +652,16 @@ function calculateScoring(room, winType, winnerId, loserId) {
     //     room.players[pid].score += scoreChanges[pid];
     // }
 
-     // 稳扎稳打逻辑 (Silver New 9)
+     // 稳扎稳打逻辑 (Gold New 12)
      room.players.forEach(p => {
          if (winType === 'dianpao' && p.id === loserId) {
              p.consecutiveNonDianpao = 0;
          } else {
              p.consecutiveNonDianpao = (p.consecutiveNonDianpao || 0) + 1;
-             if (p.hextechs.includes('silver_new_9') && p.consecutiveNonDianpao % 3 === 0) {
-                 // p.score += 4; // 移除直接修改，统一使用 scoreChanges
-                 scoreChanges[p.id] += 4;
-                 summary.push(`${p.name} 触发【稳扎稳打】，连续 3 局未点炮，获得 4 积分奖励！`);
+             if (p.hextechs.includes('gold_new_12') && p.consecutiveNonDianpao % 3 === 0) {
+                 // p.score += 5; // 移除直接修改，统一使用 scoreChanges
+                 scoreChanges[p.id] += 5;
+                 summary.push(`${p.name} 触发【稳扎稳打】，连续 3 局未点炮，获得 5 积分奖励！`);
              }
          }
      });
@@ -833,7 +764,7 @@ function startNextRound(roomName, winnerId, winType) {
         room.state.gangScores = {};
         room.pendingActions = {};
         room.players.forEach(player => {
-            player.isBot = false;
+            // player.isBot = false; // 保持上一局的托管状态
             player.prism9Terminated = false;
             player.drawCountThisRound = 0;
             player.hand = [];
@@ -841,7 +772,7 @@ function startNextRound(roomName, winnerId, winType) {
             player.peng = [];
             player.gang = [];
             player.isTing = false;
-            player.silver3Used = false;
+            // player.silver3Used = false; // Removed
             player.goldNew5Used = false;
             for (let i = 0; i < 13; i++) {
                 player.hand.push(room.state.deck.pop());
@@ -888,7 +819,7 @@ function startNextRound(roomName, winnerId, winType) {
         player.peng = [];
         player.gang = [];
         player.isTing = false;
-        player.silver3Used = false;
+        // player.silver3Used = false; // Removed
         player.goldNew5Used = false;
         // 注意：不重置 score, hextechs, consecutiveWins 等跨局数据
         
@@ -1006,7 +937,7 @@ io.on('connection', (socket) => {
             }
             const offlineCount = room.players.filter(p => p.isOffline).length;
             socket.emit('error', offlineCount > 0
-                ? '房间已满（当前有 ' + offlineCount + ' 人离线）。若您是断线玩家，请用相同用户名重新加入即可重连。'
+                ? '房间已满（当前有 ' + offlineCount + ' 人离线）。若您是断线玩家，请刷新页面后用相同用户名重新加入即可重连。'
                 : '房间已满。若为断线重连，请使用相同用户名重新加入该房间。');
             return;
         }
@@ -1116,16 +1047,19 @@ io.on('connection', (socket) => {
             if (chosenId === PRISM_FATE_ID && PRISMATIC_OTHER.length > 0) {
                 chosenId = PRISMATIC_OTHER[Math.floor(Math.random() * PRISMATIC_OTHER.length)];
                 console.log(`[${roomName}] 棱彩命运 → 随机替换为 ${chosenId}`);
+                
+                // 棱彩命运额外加 15 分
+                player.score += 15;
             }
             player.hextechs.push(chosenId);
 
-            // Silver New 4: 红包开局 (+10)
-            if (chosenId === 'silver_new_4') {
-                player.score += 10;
-                io.to(roomName).emit('systemMessage', `${player.name} 选择了【红包开局】，立即获得 10 积分！`);
+            // Gold New 10: 红包开局 (+20)
+            if (chosenId === 'gold_new_10') {
+                player.score += 20;
+                io.to(roomName).emit('systemMessage', `${player.name} 选择了【红包开局】，立即获得 20 积分！`);
             }
             if (data.hextechId === PRISM_FATE_ID && chosenId !== PRISM_FATE_ID) {
-                io.to(roomName).emit('systemMessage', `${player.name} 的【棱彩命运】随机到了另一枚彩色海克斯！`);
+                io.to(roomName).emit('systemMessage', `${player.name} 的【棱彩命运】随机到了另一枚彩色海克斯，并获得 15 分！`);
             }
 
             io.to(roomName).emit('hextechSelected', {
@@ -1364,22 +1298,14 @@ io.on('connection', (socket) => {
                 io.to(roomName).emit('systemMessage', `${player.name} 触发【疯狂杠精】，杠分翻倍！`);
             }
 
-            // Silver 6: 补杠达人 (补杠时每家多付1分)
+            // Silver 6: 补杠达人 (已移除)
             let extraPerTarget = 0;
-            if (gangType === 'added' && player.hextechs.includes('silver_6')) {
-                extraPerTarget += 1;
-                io.to(roomName).emit('systemMessage', `${player.name} 触发【补杠达人】，额外收取 1 分！`);
-            }
 
             // 3. Apply Scores
             targets.forEach(targetId => {
                 let payment = baseScore + extraPerTarget;
                 
-                // Silver 1: 杠头小利 (明杠额外+1) - 这是一个独立加成，不享受 Gold 1 翻倍
-                if (gangType === 'ming' && player.hextechs.includes('silver_1')) {
-                    payment += 1;
-                    // Log handled below
-                }
+                // Silver 1: 杠头小利 (已移除)
 
                 // Update scores
                 const target = room.players.find(p => p.id === targetId);
@@ -1388,16 +1314,8 @@ io.on('connection', (socket) => {
                     player.score += payment;
                     
                     // Log
-                    if (gangType === 'ming' && player.hextechs.includes('silver_1')) {
-                         io.to(roomName).emit('systemMessage', `${player.name} 触发【杠头小利】，额外收取 1 分！`);
-                    }
                     
-                    // Silver 12: 礼尚往来 (出牌被杠，对方补偿1分) - 反向补偿
-                    if (gangType === 'ming' && target.hextechs.includes('silver_12')) {
-                        player.score -= 1;
-                        target.score += 1;
-                        io.to(roomName).emit('systemMessage', `${target.name} 触发【礼尚往来】，获得 1 积分补偿！`);
-                    }
+                    // Silver 12: 礼尚往来 (已移除)
                 }
             });
 
@@ -1456,36 +1374,8 @@ io.on('connection', (socket) => {
             broadcastGameState(roomName);
         }
         else if (type === 'swap') {
-            // 按请求区分：摸牌入门 = 只传 tile；资源回收 = 传 handTile + discardTile + discardIdx，避免同时拥有时摸牌入门被资源回收分支拦截
-            const isSilver3Request = (data.tile != null || data.handTile != null) && data.discardTile == null && data.discardIdx == null;
             const isGoldNew5Request = data.handTile != null && data.discardTile != null;
 
-            // Silver 3: 摸牌入门（每局轮到自己第一次出牌时：选一张手牌与牌堆随机一张交换）
-            if (isSilver3Request && player.hextechs.includes('silver_3') && !player.silver3Used) {
-                if (room.state.currentPlayerIndex !== player.id) {
-                    io.to(player.socketId).emit('error', '【摸牌入门】只能在轮到自己出牌时使用');
-                    return;
-                }
-                if (room.state.turnDiscarded) {
-                    io.to(player.socketId).emit('error', '【摸牌入门】只能在出牌前使用');
-                    return;
-                }
-                const handTile = data.tile != null ? data.tile : data.handTile;
-                const hIdx = player.hand.indexOf(handTile);
-                if (hIdx === -1 || room.state.deck.length === 0) {
-                    io.to(player.socketId).emit('error', '【摸牌入门】请选择手牌中的一张牌');
-                    return;
-                }
-                const randomIdx = Math.floor(Math.random() * room.state.deck.length);
-                const newTile = room.state.deck[randomIdx];
-                room.state.deck[randomIdx] = handTile;
-                player.hand[hIdx] = newTile;
-                player.silver3Used = true;
-                sortHand(player.hand);
-                io.to(roomName).emit('systemMessage', `【摸牌入门】交换成功！新牌为：${newTile}`);
-                broadcastGameState(roomName);
-                return;
-            }
             // Gold New 5: 资源回收（轮到自己出牌时，手牌与弃牌区交换，每回合限一次）
             if (isGoldNew5Request && player.hextechs.includes('gold_new_5')) {
                 if (player.goldNew5Used) {
@@ -1548,7 +1438,7 @@ io.on('connection', (socket) => {
             }
 
             // 听牌后可选杠时选择了过：本回合是摸牌得到的，应自动出牌（打出一张）
-            if (room.state.currentPlayerIndex === player.id && room.state.currentPlayerDrewThisTurn) {
+            if (room.state.currentPlayerIndex === player.id && room.state.currentPlayerDrewThisTurn && player.isTing) {
                 if (room.actionTimer) clearTimeout(room.actionTimer);
                 const tileIndex = player.hand.length - 1;
                 const tile = player.hand[tileIndex];
@@ -1709,8 +1599,21 @@ io.on('connection', (socket) => {
                      }
                  }
              } else {
-                 startTurnTimer(roomName, nextPlayer.id);
-             }
+                // Check for Gang options for non-ting players too
+                const gangOptions = getGangOptionsForTingPlayer(nextPlayer);
+                if (gangOptions.length > 0) {
+                    const actions = gangOptions.map(opt => ({ type: 'gang', data: { type: opt.type, tile: opt.tile } }));
+                    // Include 'pass' action so frontend can show a "Skip" button if it blocks UI
+                    actions.push({ type: 'pass' });
+                    
+                    io.to(nextPlayer.socketId).emit('availableActions', {
+                        actions: actions,
+                        discarderId: nextPlayer.id,
+                        isZimo: false
+                    });
+                }
+                startTurnTimer(roomName, nextPlayer.id);
+            }
 
         broadcastGameState(roomName);
     }
@@ -1916,7 +1819,7 @@ io.on('connection', (socket) => {
             self: {
                 hand: recipient.hand,
                 hextechOptions: recipient.hextechOptions,
-                silver3Used: recipient.silver3Used,
+                // silver3Used: recipient.silver3Used, // Removed
                 goldNew5Used: recipient.goldNew5Used,
                 isTakeover: !!recipient.isBot
             }
@@ -2015,7 +1918,7 @@ function startGame(roomName) {
         player.peng = [];
         player.gang = [];
         player.isTing = false;
-        player.silver3Used = false;
+        // player.silver3Used = false; // Removed
         player.consecutiveNonDianpao = 0;
         
         for (let i = 0; i < 13; i++) {
