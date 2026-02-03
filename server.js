@@ -811,7 +811,7 @@ function startNextRound(roomName, winnerId, winType) {
 
     // 重置玩家手牌等
     room.players.forEach(player => {
-        player.isBot = false;
+        // player.isBot = false; // 保持上一局的托管状态
         player.prism9Terminated = false;
         player.drawCountThisRound = 0;
         player.hand = [];

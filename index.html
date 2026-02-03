@@ -892,7 +892,7 @@
         // Prismatic
         'prism_3': { id: 'prism_3', tier: 'prismatic', name: '暗箭难防', desc: '手中暗刻结算时算暗杠分（不公开）。' },
         'prism_4': { id: 'prism_4', tier: 'prismatic', name: '推倒之王', desc: '胡牌时，未听牌者支付翻倍。' },
-        'prism_6': { id: 'prism_6', tier: 'prismatic', name: '庄家杀手', desc: '闲家胡庄家（点炮/自摸），庄家付3倍。' },
+        'prism_6': { id: 'prism_6', tier: 'prismatic', name: '庄家杀手', desc: '闲家胡庄家（点炮/自摸），庄家付4倍。' },
         'prism_9': { id: 'prism_9', tier: 'prismatic', name: '十三幺契约', desc: '第一次出牌后，只要手牌没有对子（允许顺子），每巡+1分(由系统支付)。一旦出牌后手牌有对子，契约终止。' },
         'prism_new_1': { id: 'prism_new_1', tier: 'prismatic', name: '全民皆兵', desc: '别人给你点炮视为你自摸。' },
         'prism_new_2': { id: 'prism_new_2', tier: 'prismatic', name: '天命所归', desc: '开局指定一张随机牌为“万能牌”（仅手牌有效）。' },
@@ -1607,6 +1607,7 @@
         '东风': 'dong', '南风': 'nan', '西风': 'xi', '北风': 'bei'
     };
 
+    window.PRELOADED_IMAGES = {};
     function preloadTileImages() {
         var base;
         if (window.location && window.location.protocol === 'file:') base = './';
@@ -1620,8 +1621,12 @@
             var imgName = TILE_IMAGE_MAP[k];
             if (seen[imgName]) continue;
             seen[imgName] = true;
-            var img = new Image();
-            img.src = base + 'tiles/' + imgName + '.png';
+            
+            if (!window.PRELOADED_IMAGES[imgName]) {
+                var img = new Image();
+                img.src = base + 'tiles/' + imgName + '.png';
+                window.PRELOADED_IMAGES[imgName] = img;
+            }
         }
     }
     preloadTileImages();
@@ -4125,7 +4130,13 @@
                 var i = p.lastIndexOf('/');
                 base = i >= 0 ? p.slice(0, i + 1) : '/';
             }
-            return '<div class="tile-content"><img src="' + base + 'tiles/' + imgName + '.png" alt="' + tile + '"></div>';
+            
+            var extraClass = '';
+            if (window.PRELOADED_IMAGES && window.PRELOADED_IMAGES[imgName] && window.PRELOADED_IMAGES[imgName].complete) {
+                extraClass = ' tile-img-loaded';
+            }
+            
+            return '<div class="tile-content"><img src="' + base + 'tiles/' + imgName + '.png" alt="' + tile + '" class="' + extraClass + '"></div>';
         }
         const suit = tile.slice(-1);
         const numStr = tile.slice(0, -1);
